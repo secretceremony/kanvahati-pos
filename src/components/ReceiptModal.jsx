@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { t } from '../services/translations';
 
 export default function ReceiptModal({ transaction, onClose, onPrint }) {
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
     if (!transaction) return null;
 
     const formattedDate = new Date(transaction.timestamp).toLocaleString();
@@ -11,13 +13,65 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
         return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
     };
 
+    const getCleanHtml = () => `
+        <div style="font-family: Arial, sans-serif; padding: 20px; width: 280px; color: #000; background: #fff; margin: 0 auto; box-sizing: border-box;">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: bold; letter-spacing: 1px;">KANVAHATI POS</h3>
+                <p style="margin: 4px 0 0 0; font-size: 11px; color: #444;">Dicetak dari Kanvahati POS</p>
+            </div>
+            <hr style="border: none; border-top: 1.5px dashed #000; margin: 12px 0;" />
+            <div style="font-size: 12px; line-height: 1.5;">
+                <div><strong>ID Pesanan:</strong> ${transaction.id}</div>
+                <div><strong>Tanggal:</strong> ${formattedDate}</div>
+                <div><strong>Kasir:</strong> ${transaction.cashier || "Kasir Peach 🌸"}</div>
+            </div>
+            <hr style="border: none; border-top: 1.5px dashed #000; margin: 12px 0;" />
+            <div style="font-size: 12px; line-height: 1.6;">
+                ${(transaction.items || []).map(item => `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="flex: 1; padding-right: 10px;">${item.qty}x ${item.name}</span>
+                        <span style="font-weight: bold; white-space: nowrap;">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</span>
+                    </div>
+                `).join('')}
+            </div>
+            <hr style="border: none; border-top: 1.5px dashed #000; margin: 12px 0;" />
+            <div style="font-size: 12px; line-height: 1.5;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Subtotal:</span>
+                    <span>Rp ${(transaction.subtotal || 0).toLocaleString('id-ID')}</span>
+                </div>
+                ${(transaction.appliedBundles || []).map(b => `
+                    <div style="display: flex; justify-content: space-between; color: #d81b60;">
+                        <span>Promo: ${b.bundleName}</span>
+                        <span>-Rp ${b.discount.toLocaleString('id-ID')}</span>
+                    </div>
+                `).join('')}
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #000;">
+                    <span>Total Akhir:</span>
+                    <span>Rp ${(transaction.total || 0).toLocaleString('id-ID')}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                    <span>Metode:</span>
+                    <span style="font-weight: bold;">${transaction.paymentMethod === 'cash' ? 'TUNAI' : 'QRIS'}</span>
+                </div>
+            </div>
+            <hr style="border: none; border-top: 1.5px dashed #000; margin: 15px 0;" />
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="margin: 0; font-size: 12px; font-weight: bold;">Transaksi Selesai!</p>
+                <p style="margin: 4px 0 0 0; font-size: 10px; color: #444;">@kanvahati</p>
+            </div>
+        </div>
+    `;
+
     const handleDownloadPDF = () => {
-        const element = document.getElementById('receipt-print-area');
-        if (!element) return;
+        if (isGeneratingPdf) return;
+        
+        setIsGeneratingPdf(true);
         
         try {
             if (!window.html2pdf) {
                 alert("Pustaka PDF (html2pdf) belum dimuat. Menggunakan print browser...");
+                setIsGeneratingPdf(false);
                 handlePrint();
                 return;
             }
@@ -30,11 +84,18 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                 jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
             };
             
-            window.html2pdf().from(element).set(opt).save();
+            // Pass the raw HTML string directly! This creates a clean iframe without Tailwind v4's oklab CSS.
+            window.html2pdf().from(getCleanHtml()).set(opt).save().then(() => {
+                setIsGeneratingPdf(false);
+            }).catch(e => {
+                console.error("PDF generation failed:", e);
+                alert("Error PDF: " + (e.message || JSON.stringify(e) || "Unknown Error"));
+                setIsGeneratingPdf(false);
+            });
         } catch (e) {
-            console.error("PDF generation failed, falling back to print", e);
-            alert("Gagal mengunduh PDF, menggunakan printer...");
-            handlePrint();
+            console.error("PDF generation error:", e);
+            alert("Gagal memulai unduhan PDF.");
+            setIsGeneratingPdf(false);
         }
     };
 
@@ -50,76 +111,12 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                 <head>
                     <title>Cetak Struk ${transaction.id}</title>
                     <style>
-                        @page {
-                            margin: 0;
-                        }
-                        body {
-                            font-family: 'Courier New', Courier, monospace;
-                            padding: 15px;
-                            width: 280px;
-                            font-size: 12px;
-                            color: #000;
-                            margin: 0 auto;
-                        }
-                        .text-center { text-align: center; }
-                        .mb-2 { margin-bottom: 8px; }
-                        .mb-3 { margin-bottom: 12px; }
-                        .my-2 { margin-top: 8px; margin-bottom: 8px; }
-                        .font-bold { font-weight: bold; }
-                        .flex { display: flex; }
-                        .justify-between { justify-content: space-between; }
-                        .border-dashed { border-top: 1.5px dashed #000; }
+                        @page { margin: 0; }
+                        body { margin: 0; background: #fff; }
                     </style>
                 </head>
                 <body>
-                    <div class="text-center mb-3">
-                        <h3 style="margin: 0; font-size: 15px; letter-spacing: 1px;">KANVAHATI POS</h3>
-                        <p style="margin: 3px 0 0 0; font-size: 10px;">Dicetak dari Kanvahati POS</p>
-                    </div>
-                    <div class="border-dashed my-2"></div>
-                    <div style="font-size: 11px; line-height: 1.4;">
-                        <div><strong>ID Pesanan:</strong> ${transaction.id}</div>
-                        <div><strong>Tanggal:</strong> ${formattedDate}</div>
-                        <div><strong>Kasir:</strong> ${transaction.cashier || "Kasir Peach 🌸"}</div>
-                    </div>
-                    <div class="border-dashed my-2"></div>
-                    <div style="line-height: 1.5;">
-                        ${(transaction.items || []).map(item => `
-                            <div class="flex justify-between">
-                                <span style="max-width: 190px; word-wrap: break-word;">${item.qty}x ${item.name}</span>
-                                <span class="font-bold">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="border-dashed my-2"></div>
-                    <div style="font-size: 11px; line-height: 1.4;">
-                        <div class="flex justify-between">
-                            <span>Subtotal:</span>
-                            <span>Rp ${(transaction.subtotal || 0).toLocaleString('id-ID')}</span>
-                        </div>
-                        ${(transaction.appliedBundles || []).map(b => `
-                            <div class="flex justify-between" style="color: #d81b60;">
-                                <span>Promo: ${b.bundleName}</span>
-                                <span>-Rp ${b.discount.toLocaleString('id-ID')}</span>
-                            </div>
-                        `).join('')}
-                        <div class="flex justify-between font-bold" style="font-size: 13px; margin-top: 5px; border-top: 1px solid #000; padding-top: 5px;">
-                            <span>Total Akhir:</span>
-                            <span>Rp ${(transaction.total || 0).toLocaleString('id-ID')}</span>
-                        </div>
-                        <div class="flex justify-between" style="margin-top: 4px;">
-                            <span>Metode:</span>
-                            <span class="font-bold">${transaction.paymentMethod === 'cash' ? 'TUNAI' : 'QRIS'}</span>
-                        </div>
-                    </div>
-                    <div class="border-dashed my-2" style="margin-top: 15px;"></div>
-                    <div class="text-center" style="margin-top: 15px;">
-                        <div style="border: 2px solid #000; display: inline-block; padding: 3px 8px; font-weight: bold; transform: rotate(-5deg); margin-bottom: 8px; font-size: 12px;">
-                            DISETUJUI
-                        </div>
-                        <p style="margin: 0; font-size: 10px; font-weight: bold;">Transaksi Selesai!</p>
-                        <p style="margin: 4px 0 0 0; font-size: 9px; opacity: 0.8;">@kanvahati</p>
-                    </div>
+                    ${getCleanHtml()}
                     <script>
                         window.onload = function() {
                             window.print();
@@ -216,9 +213,14 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                     </button>
                     <button 
                         onClick={handleDownloadPDF} 
-                        className="btn bg-yellow text-text border-[3px] border-text rounded-full font-title text-[14px] px-6 py-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center gap-2"
+                        disabled={isGeneratingPdf}
+                        className={`btn ${isGeneratingPdf ? 'bg-gray-300' : 'bg-yellow hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f]'} text-text border-[3px] border-text rounded-full font-title text-[14px] px-6 py-2 shadow-btn active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center gap-2`}
                     >
-                        <i className="fa-solid fa-file-pdf text-xs"></i> PDF
+                        {isGeneratingPdf ? (
+                            <><i className="fa-solid fa-spinner fa-spin text-xs"></i> Tunggu...</>
+                        ) : (
+                            <><i className="fa-solid fa-file-pdf text-xs"></i> PDF</>
+                        )}
                     </button>
                     <button 
                         onClick={handlePrint} 
