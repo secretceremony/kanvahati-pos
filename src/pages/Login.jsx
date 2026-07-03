@@ -1,20 +1,33 @@
 import React, { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 
 export default function Login({ onLoginSuccess, showToast }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const targetEmail = "folks@itk.ac.id";
-        const targetPassword = "FOLKS2026";
+        setIsLoading(true);
 
-        if (email.trim().toLowerCase() === targetEmail && password === targetPassword) {
+        try {
+            await signInWithEmailAndPassword(auth, email.trim(), password);
             showToast("Selamat datang kembali! Login berhasil.", "🎉");
             onLoginSuccess();
-        } else {
-            showToast("Email atau password salah!", "⚠️");
+        } catch (error) {
+            let message = "Email atau password salah!";
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                message = "Email atau password salah!";
+            } else if (error.code === 'auth/too-many-requests') {
+                message = "Terlalu banyak percobaan. Coba lagi nanti.";
+            } else if (error.code === 'auth/network-request-failed') {
+                message = "Koneksi gagal. Periksa internet Anda.";
+            }
+            showToast(message, "⚠️");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -52,7 +65,8 @@ export default function Login({ onLoginSuccess, showToast }) {
                                 placeholder="nama@domain.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:bg-yellow-light/40 bg-white"
+                                disabled={isLoading}
+                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:bg-yellow-light/40 bg-white disabled:opacity-50"
                             />
                         </div>
                     </div>
@@ -68,7 +82,8 @@ export default function Login({ onLoginSuccess, showToast }) {
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-10 text-sm outline-none focus:bg-yellow-light/40 bg-white"
+                                disabled={isLoading}
+                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-10 text-sm outline-none focus:bg-yellow-light/40 bg-white disabled:opacity-50"
                             />
                             <button
                                 type="button"
@@ -83,9 +98,19 @@ export default function Login({ onLoginSuccess, showToast }) {
                     {/* Submit Button */}
                     <button 
                         type="submit"
-                        className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] py-3 mt-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold"
+                        disabled={isLoading}
+                        className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] py-3 mt-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-btn disabled:hover:bg-pink"
                     >
-                        <span>Masuk ke POS</span> <i className="fa-solid fa-right-to-bracket text-xs"></i>
+                        {isLoading ? (
+                            <>
+                                <i className="fa-solid fa-spinner fa-spin text-xs"></i>
+                                <span>Memproses...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>Masuk ke POS</span> <i className="fa-solid fa-right-to-bracket text-xs"></i>
+                            </>
+                        )}
                     </button>
                 </form>
 

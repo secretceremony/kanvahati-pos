@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './firebase';
 
 const Register = React.lazy(() => import('./pages/Register'));
 const Logs = React.lazy(() => import('./pages/Logs'));
@@ -67,9 +69,16 @@ export default function App() {
     const [activeCashier, setActiveCashier] = useState(() => {
         return localStorage.getItem('kanvahati_cashier') || "Kasir Peach 🌸";
     });
-    const [isAuthenticated, setIsAuthenticated] = useState(() => {
-        return localStorage.getItem('kanvahati_authenticated') === 'true';
-    });
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [authLoading, setAuthLoading] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setIsAuthenticated(!!user);
+            setAuthLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const handleCashierChange = (newName) => {
         if (newName && newName.trim()) {
@@ -104,13 +113,23 @@ export default function App() {
         setActiveTransaction(null);
     };
 
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-blue-light/20 font-body text-text">
+                <div className="text-center">
+                    <i className="fa-solid fa-spinner fa-spin text-2xl text-text/60 mb-3"></i>
+                    <p className="text-sm font-bold opacity-60">Memuat...</p>
+                </div>
+            </div>
+        );
+    }
+
     if (!isAuthenticated) {
         return (
             <>
                 <Login 
                     onLoginSuccess={() => {
                         setIsAuthenticated(true);
-                        localStorage.setItem('kanvahati_authenticated', 'true');
                     }}
                     showToast={showToast}
                 />
@@ -163,11 +182,14 @@ export default function App() {
                             
                             {/* Logout button */}
                             <button 
-                                onClick={() => {
+                                onClick={async () => {
                                     if (window.confirm("Apakah Anda yakin ingin logout?")) {
-                                        setIsAuthenticated(false);
-                                        localStorage.removeItem('kanvahati_authenticated');
-                                        showToast("Anda telah keluar.", "🔒");
+                                        try {
+                                            await signOut(auth);
+                                            showToast("Anda telah keluar.", "🔒");
+                                        } catch (error) {
+                                            showToast("Gagal logout. Coba lagi.", "⚠️");
+                                        }
                                     }
                                 }}
                                 className="text-pink bg-white border-2 border-text rounded-full p-1.5 hover:bg-pink-light hover:scale-110 transition-all cursor-pointer flex items-center justify-center text-xs shadow-[1.5px_1.5px_0px_#32628f] shrink-0"
