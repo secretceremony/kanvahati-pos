@@ -97,6 +97,12 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                             <span>Subtotal:</span>
                             <span>Rp ${(transaction.subtotal || 0).toLocaleString('id-ID')}</span>
                         </div>
+                        ${(transaction.appliedBundles || []).map(b => `
+                            <div class="flex justify-between" style="color: #d81b60;">
+                                <span>Promo: ${b.bundleName}</span>
+                                <span>-Rp ${b.discount.toLocaleString('id-ID')}</span>
+                            </div>
+                        `).join('')}
                         <div class="flex justify-between font-bold" style="font-size: 13px; margin-top: 5px; border-top: 1px solid #000; padding-top: 5px;">
                             <span>Total Akhir:</span>
                             <span>Rp ${(transaction.total || 0).toLocaleString('id-ID')}</span>
@@ -168,6 +174,12 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                             <span>{t.subtotal}:</span>
                             <span>{formatReceiptMoney(transaction.subtotal || 0)}</span>
                         </div>
+                        {transaction.appliedBundles && transaction.appliedBundles.length > 0 && transaction.appliedBundles.map((b, idx) => (
+                            <div key={idx} className="r-summary-row flex justify-between text-pink font-bold">
+                                <span>Promo: {b.bundleName}</span>
+                                <span>-{formatReceiptMoney(b.discount)}</span>
+                            </div>
+                        ))}
                         <div className="r-summary-row font-bold flex justify-between text-[15px] border-t border-text/20 pt-1.5 mt-1">
                             <span>{t.grandTotal}:</span>
                             <span>{formatReceiptMoney(transaction.total || 0)}</span>

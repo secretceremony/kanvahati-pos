@@ -63,5 +63,20 @@ export const t = {
     restock: "Isi Stok",
     invalidPrice: "Masukkan harga yang valid!",
     addSuccess: "Produk berhasil ditambahkan!",
-    deleteSuccess: "Produk berhasil dihapus!"
+    deleteSuccess: "Produk berhasil dihapus!",
+    
+    // Bundle/Promo specific keys
+    promo: "Promo",
+    bundles: "Paket Bundle",
+    addBundle: "Buat Bundle",
+    bundleName: "Nama Paket",
+    bundlePrice: "Harga Paket",
+    originalPrice: "Harga Asli",
+    discount: "Hemat",
+    bundleItems: "Isi Paket",
+    applyBundle: "Pakai Bundle",
+    skipBundle: "Lewati",
+    bundleAvailable: "Promo Tersedia!",
+    active: "Aktif",
+    inactive: "Nonaktif"
 };

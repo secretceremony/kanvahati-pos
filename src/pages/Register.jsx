@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getProducts, saveTransaction, getCategories } from '../services/db';
+import { getProducts, saveTransaction, getCategories, getBundles } from '../services/db';
 import { t } from '../services/translations';
+import BundleSuggestionBanner from '../components/BundleSuggestionBanner';
 
 export default function Register({ onCheckoutSuccess, showToast, activeCashier }) {
     const [products, setProducts] = useState([]);
@@ -10,6 +11,11 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     const [ticket, setTicket] = useState([]);
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [loading, setLoading] = useState(true);
+    
+    // Bundles state
+    const [availableBundles, setAvailableBundles] = useState([]);
+    const [suggestedBundles, setSuggestedBundles] = useState([]);
+    const [dismissedBundles, setDismissedBundles] = useState(new Set());
     
     // QRIS scan overlay visibility state
     const [showQrisModal, setShowQrisModal] = useState(false);
@@ -24,12 +30,14 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [prodsData, catsData] = await Promise.all([
+            const [prodsData, catsData, bundlesData] = await Promise.all([
                 getProducts(),
-                getCategories()
+                getCategories(),
+                getBundles()
             ]);
             setProducts(prodsData);
             setCategories(catsData);
+            setAvailableBundles(bundlesData.filter(b => b.isActive));
         } catch (e) {
             console.error("Failed to load catalog data", e);
         } finally {
@@ -129,6 +137,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         setTicket(prev => {
             return prev.map(item => {
                 if (item.id === productId && item.variationName === variationName) {
+                    if (item.isBundle) return item; // Disallow +/- for bundles
                     const newQty = item.qty + delta;
                     if (newQty <= 0) return null;
                     if (newQty > item.maxStock) {
@@ -142,16 +151,54 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         });
     };
 
-    // Remove item
+    // Remove item (handles undo for bundles)
     const handleRemoveItem = (productId, variationName) => {
-        setTicket(prev => prev.filter(item => !(item.id === productId && item.variationName === variationName)));
-        showToast("Barang dihapus.", "🗑️");
+        setTicket(prev => {
+            const itemToRemove = prev.find(item => item.id === productId && item.variationName === variationName);
+            if (itemToRemove && itemToRemove.isBundle) {
+                // Restore individual items
+                let newTicket = prev.filter(item => !(item.id === productId && item.variationName === variationName));
+                
+                itemToRemove.bundleItems.forEach(bItem => {
+                    const originalProduct = products.find(p => p.id === bItem.productId);
+                    if (!originalProduct) return;
+                    
+                    const existingIdx = newTicket.findIndex(t => t.id === bItem.productId && t.variationName === bItem.variationName);
+                    if (existingIdx > -1) {
+                        newTicket[existingIdx].qty += bItem.qty;
+                    } else {
+                        newTicket.push({
+                            id: bItem.productId,
+                            name: originalProduct.name,
+                            price: originalProduct.price, // fallback if no variation
+                            qty: bItem.qty,
+                            variationName: bItem.variationName,
+                            maxStock: originalProduct.stock // This isn't perfect for variations but fine for restore
+                        });
+                        // Recalculate price/stock if it's a variation
+                        if (bItem.variationName && originalProduct.variations) {
+                            const variation = originalProduct.variations.find(v => v.name === bItem.variationName);
+                            if (variation) {
+                                newTicket[newTicket.length-1].price = variation.price;
+                                newTicket[newTicket.length-1].maxStock = variation.stock;
+                            }
+                        }
+                    }
+                });
+                showToast("Promo dibatalkan", "🔙");
+                return newTicket;
+            }
+            
+            showToast("Barang dihapus.", "🗑️");
+            return prev.filter(item => !(item.id === productId && item.variationName === variationName));
+        });
     };
 
     // Clear ticket
     const handleClearTicket = () => {
         if (ticket.length === 0) return;
         setTicket([]);
+        setDismissedBundles(new Set()); // Reset dismissed banners
         showToast(t.cleared, "🧹");
     };
 
@@ -173,10 +220,38 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     const completeCheckout = async () => {
         const totals = calculateTotals();
         setShowQrisModal(false);
+        
+        // Expand bundles before saving to DB
+        let expandedItems = [];
+        ticket.forEach(item => {
+            if (item.isBundle) {
+                item.bundleItems.forEach(bItem => {
+                    const product = products.find(p => p.id === bItem.productId);
+                    if (product) {
+                        let price = product.price;
+                        if (bItem.variationName && product.variations) {
+                            const variation = product.variations.find(v => v.name === bItem.variationName);
+                            if (variation) price = variation.price;
+                        }
+                        expandedItems.push({
+                            id: bItem.productId,
+                            name: product.name,
+                            price: price,
+                            qty: bItem.qty,
+                            variationName: bItem.variationName,
+                            fromBundle: item.id
+                        });
+                    }
+                });
+            } else {
+                expandedItems.push(item);
+            }
+        });
 
         try {
-            const transaction = await saveTransaction(ticket, totals, paymentMethod, activeCashier);
+            const transaction = await saveTransaction(expandedItems, totals, paymentMethod, activeCashier, totals.appliedBundles);
             setTicket([]);
+            setDismissedBundles(new Set());
             await fetchData(); // Refresh stock variables in grids
             onCheckoutSuccess(transaction);
             showToast(t.paymentSuccess, "🎉");
@@ -189,17 +264,142 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     const calculateTotals = () => {
         let qty = 0;
         let subtotal = 0;
+        let appliedBundles = [];
         
         ticket.forEach(item => {
-            qty += item.qty;
-            subtotal += item.price * item.qty;
+            if (item.isBundle) {
+                qty += item.bundleItems.reduce((sum, b) => sum + b.qty, 0); // count individual items
+                
+                // Calculate discount for display
+                let originalPrice = 0;
+                item.bundleItems.forEach(bItem => {
+                    const prod = products.find(p => p.id === bItem.productId);
+                    if (prod) {
+                        let price = prod.price;
+                        if (bItem.variationName && prod.variations) {
+                            const variation = prod.variations.find(v => v.name === bItem.variationName);
+                            if (variation) price = variation.price;
+                        }
+                        originalPrice += price * bItem.qty;
+                    }
+                });
+                
+                appliedBundles.push({
+                    bundleId: item.id,
+                    bundleName: item.name.replace('🎁 ', ''),
+                    originalPrice,
+                    bundlePrice: item.price,
+                    discount: Math.max(0, originalPrice - item.price)
+                });
+                
+                subtotal += originalPrice; // Add the original price to the subtotal
+            } else {
+                qty += item.qty;
+                subtotal += item.price * item.qty;
+            }
         });
         
-        const total = subtotal; // Grand total is exactly equal to subtotal
-        return { qty, subtotal, total };
+        const totalDiscount = appliedBundles.reduce((sum, b) => sum + b.discount, 0);
+        const total = subtotal - totalDiscount;
+        return { qty, subtotal, total, appliedBundles };
     };
 
     const totals = calculateTotals();
+
+    // Bundle Detection Logic
+    useEffect(() => {
+        if (availableBundles.length === 0 || products.length === 0) return;
+        
+        const nonBundleItems = ticket.filter(item => !item.isBundle);
+        let suggestions = [];
+        
+        availableBundles.forEach(bundle => {
+            if (dismissedBundles.has(bundle.id)) return;
+            
+            // Check if all requirements are met
+            let meetsRequirements = true;
+            for (const reqItem of bundle.items) {
+                const ticketItem = nonBundleItems.find(i => 
+                    i.id === reqItem.productId && 
+                    (reqItem.variationName ? i.variationName === reqItem.variationName : true)
+                );
+                
+                if (!ticketItem || ticketItem.qty < reqItem.qty) {
+                    meetsRequirements = false;
+                    break;
+                }
+            }
+            
+            if (meetsRequirements) {
+                // Calculate original price for banner display
+                let originalPrice = 0;
+                bundle.items.forEach(reqItem => {
+                    const prod = products.find(p => p.id === reqItem.productId);
+                    if (prod) {
+                        let price = prod.price;
+                        if (reqItem.variationName && prod.variations) {
+                            const variation = prod.variations.find(v => v.name === reqItem.variationName);
+                            if (variation) price = variation.price;
+                        }
+                        originalPrice += price * reqItem.qty;
+                    }
+                });
+                
+                suggestions.push({
+                    ...bundle,
+                    originalPrice
+                });
+            }
+        });
+        
+        setSuggestedBundles(suggestions);
+    }, [ticket, availableBundles, dismissedBundles, products]);
+
+    const handleApplyBundle = (bundle) => {
+        setTicket(prev => {
+            let newTicket = [...prev];
+            let success = true;
+            
+            // Reduce quantities
+            bundle.items.forEach(reqItem => {
+                const idx = newTicket.findIndex(i => !i.isBundle && i.id === reqItem.productId && (reqItem.variationName ? i.variationName === reqItem.variationName : true));
+                if (idx > -1) {
+                    newTicket[idx] = { ...newTicket[idx], qty: newTicket[idx].qty - reqItem.qty };
+                    if (newTicket[idx].qty <= 0) {
+                        newTicket.splice(idx, 1);
+                    }
+                } else {
+                    success = false; // Should not happen based on detector
+                }
+            });
+            
+            if (success) {
+                // Add bundle row
+                // Ensure unique ID for multiple instances of same bundle
+                const instanceId = `${bundle.id}-${Date.now()}`;
+                newTicket.push({
+                    id: bundle.id,
+                    instanceId: instanceId, // internal React key use
+                    name: `🎁 ${bundle.name}`,
+                    price: bundle.bundlePrice,
+                    qty: 1, // Always 1
+                    isBundle: true,
+                    bundleItems: bundle.items
+                });
+                showToast("Promo berhasil diterapkan!", "🎉");
+                return newTicket;
+            }
+            return prev;
+        });
+    };
+
+    const handleDismissBundle = (bundleId) => {
+        setDismissedBundles(prev => {
+            const next = new Set(prev);
+            next.add(bundleId);
+            return next;
+        });
+    };
 
     // Format all money values strictly in IDR Rupiah
     const formatDisplayMoney = (value) => {
@@ -342,21 +542,23 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                     ) : (
                         <div className="ticket-items-list flex flex-col gap-2.5">
                             {ticket.map(item => (
-                                <div key={`${item.id}-${item.variationName || 'base'}`} className="ticket-item-row flex items-center bg-white border-2 border-text rounded-lg p-2.5 gap-2.5 shadow-[2px_2px_0px_#32628f]">
-                                    <span className="t-item-name font-title text-[12px] flex-grow truncate text-text" title={item.name}>
+                                <div key={item.instanceId || `${item.id}-${item.variationName || 'base'}`} className="ticket-item-row flex items-center bg-white border-2 border-text rounded-lg p-2.5 gap-2.5 shadow-[2px_2px_0px_#32628f]">
+                                    <span className={`t-item-name font-title text-[12px] flex-grow truncate ${item.isBundle ? 'text-pink font-bold' : 'text-text'}`} title={item.name}>
                                         {item.name}
                                     </span>
-                                    <div className="t-qty-control flex items-center border-[1.5px] border-text rounded-full overflow-hidden h-6 bg-white shrink-0">
+                                    <div className={`t-qty-control flex items-center border-[1.5px] border-text rounded-full overflow-hidden h-6 bg-white shrink-0 ${item.isBundle ? 'opacity-50' : ''}`}>
                                         <button 
                                             onClick={() => handleUpdateQty(item.id, item.variationName, -1)}
-                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-bold text-text hover:bg-blue-light"
+                                            disabled={item.isBundle}
+                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-bold text-text hover:bg-blue-light disabled:cursor-not-allowed"
                                         >
                                             -
                                         </button>
                                         <span className="t-qty-num px-1 text-[11px] font-bold min-w-4 text-center text-text">{item.qty}</span>
                                         <button 
                                             onClick={() => handleUpdateQty(item.id, item.variationName, 1)}
-                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-bold text-text hover:bg-blue-light"
+                                            disabled={item.isBundle}
+                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-bold text-text hover:bg-blue-light disabled:cursor-not-allowed"
                                         >
                                             +
                                         </button>
@@ -376,12 +578,23 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                     )}
                 </div>
 
-                <div className="ticket-footer border-t-2 border-dashed border-text/20 pt-3 shrink-0">
+                <div className="ticket-footer border-t-2 border-dashed border-text/20 pt-3 shrink-0 relative">
+                    <BundleSuggestionBanner 
+                        bundles={suggestedBundles} 
+                        onApply={handleApplyBundle} 
+                        onDismiss={handleDismissBundle} 
+                    />
                     <div className="bill-summary flex flex-col gap-1.5 mb-3 text-text">
                         <div className="summary-line flex justify-between text-xs">
                             <span>{t.itemsCount}:</span>
                             <span>{totals.qty}</span>
                         </div>
+                        {totals.appliedBundles && totals.appliedBundles.length > 0 && (
+                            <div className="summary-line flex justify-between text-xs text-pink font-bold">
+                                <span>Total Diskon Promo:</span>
+                                <span>-{formatDisplayMoney(totals.appliedBundles.reduce((s, b) => s + b.discount, 0))}</span>
+                            </div>
+                        )}
                         <div className="summary-line font-bold flex justify-between text-[16px] border-t border-text/15 pt-1.5">
                             <span>{t.totalAmount}:</span>
                             <span>{formatDisplayMoney(totals.total)}</span>
