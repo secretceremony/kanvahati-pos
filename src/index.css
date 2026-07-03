@@ -1,0 +1,89 @@
+/* --- Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=DynaPuff:wght@400..700&family=Fredoka:wght@300..700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-pink: #F79DC3;
+  --color-pink-light: #FCE6F1;
+  --color-blue: #87BAE9;
+  --color-blue-light: #E7F2FC;
+  --color-yellow: #FAF0C4;
+  --color-yellow-light: #FFFDF3;
+  --color-text: #32628F;
+  --color-white: #FFFFFF;
+  
+  --font-title: 'DynaPuff', system-ui, -apple-system, sans-serif;
+  --font-body: 'Fredoka', system-ui, -apple-system, sans-serif;
+  
+  --shadow-btn: 4px 4px 0px #32628F;
+  --shadow-card: 6px 6px 0px #32628F;
+}
+
+/* --- Global Base Overrides --- */
+body {
+  font-family: var(--font-body);
+  color: var(--color-text);
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--color-pink) 0%, var(--color-blue) 100%);
+  background-attachment: fixed;
+  overflow-x: hidden;
+  position: relative;
+  font-size: 15px;
+  line-height: 1.5;
+  /* Default browser mouse cursor is fully visible */
+}
+
+/* --- Paper Texture Overlay --- */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* --- Custom Scallop receipts for thermal print effect --- */
+.receipt-scallop-top {
+  height: 12px;
+  background-image: radial-gradient(circle at 10px 10px, transparent 8px, var(--color-white) 9px);
+  background-size: 20px 20px;
+  background-position: 0 -10px;
+  background-repeat: repeat-x;
+}
+
+.receipt-scallop-bottom {
+  height: 12px;
+  background-image: radial-gradient(circle at 10px 0px, transparent 8px, var(--color-white) 9px);
+  background-size: 20px 20px;
+  background-position: 0 10px;
+  background-repeat: repeat-x;
+}
+
+/* --- Click particle bursts --- */
+.click-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99999;
+  user-select: none;
+  animation: particleFade 0.6s ease-out forwards;
+}
+
+@keyframes particleFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* --- Custom components / utilities --- */
+.logo-stroke {
+  -webkit-text-stroke: 1px var(--color-text);
+}
+
+.title-stroke {
+  -webkit-text-stroke: 0.5px var(--color-text);
+}
