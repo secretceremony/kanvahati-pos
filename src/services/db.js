@@ -47,6 +47,16 @@ export const isUsingFirebase = () => {
     return isFirebaseConfigured;
 };
 
+// System config updater to notify other clients of data changes
+export const triggerDataUpdate = async () => {
+    if (!isUsingFirebase()) return;
+    try {
+        await setDoc(doc(db, "system", "config"), { lastDataUpdate: Date.now() }, { merge: true });
+    } catch (e) {
+        console.error("Failed to trigger data update", e);
+    }
+};
+
 // --- Custom Categories Management ---
 export const getCategories = async (forceRefetch = false) => {
     if (cacheCategories && !forceRefetch) {
@@ -109,6 +119,7 @@ export const saveCategory = async (categoryName) => {
     }
     try {
         await setDoc(doc(db, "categories", cleanCat), { name: cleanCat });
+        await triggerDataUpdate();
         return cleanCat;
     } catch (e) {
         console.error("Firestore write category failed. Saving locally.", e);
@@ -137,6 +148,7 @@ export const deleteCategory = async (categoryName) => {
     }
     try {
         await deleteDoc(doc(db, "categories", cleanCat));
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore delete category failed. Deleting locally.", e);
@@ -234,6 +246,7 @@ export const saveProduct = async (product) => {
 
     try {
         await setDoc(doc(db, "products", cleanProduct.id), cleanProduct);
+        await triggerDataUpdate();
         return cleanProduct;
     } catch (e) {
         console.error("Firestore write product failed. Saving locally.", e);
@@ -275,6 +288,7 @@ export const deleteProduct = async (productId) => {
 
     try {
         await deleteDoc(doc(db, "products", productId));
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore delete product failed. Deleting locally.", e);
@@ -317,6 +331,7 @@ export const deleteProductsBulk = async (productIds) => {
             batch.delete(doc(db, "products", id));
         });
         await batch.commit();
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore bulk delete failed. Deleting locally.", e);
@@ -929,6 +944,7 @@ export const saveBundle = async (bundle) => {
 
     try {
         await setDoc(doc(db, "bundles", cleanBundle.id), cleanBundle);
+        await triggerDataUpdate();
         return cleanBundle;
     } catch (e) {
         console.error("Firestore write bundle failed. Saving locally.", e);
@@ -955,6 +971,7 @@ export const deleteBundle = async (bundleId) => {
 
     try {
         await deleteDoc(doc(db, "bundles", bundleId));
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore delete bundle failed. Deleting locally.", e);

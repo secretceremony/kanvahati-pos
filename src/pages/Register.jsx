@@ -319,12 +319,14 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
             // Check if all requirements are met
             let meetsRequirements = true;
             for (const reqItem of bundle.items) {
-                const ticketItem = nonBundleItems.find(i => 
+                const matchingItems = nonBundleItems.filter(i => 
                     i.id === reqItem.productId && 
                     (reqItem.variationName ? i.variationName === reqItem.variationName : true)
                 );
                 
-                if (!ticketItem || ticketItem.qty < reqItem.qty) {
+                const totalMatchingQty = matchingItems.reduce((sum, i) => sum + i.qty, 0);
+                
+                if (totalMatchingQty < reqItem.qty) {
                     meetsRequirements = false;
                     break;
                 }
@@ -359,19 +361,37 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         setTicket(prev => {
             let newTicket = [...prev];
             let success = true;
+            let exactItemsConsumed = [];
             
-            // Reduce quantities
-            bundle.items.forEach(reqItem => {
-                const idx = newTicket.findIndex(i => !i.isBundle && i.id === reqItem.productId && (reqItem.variationName ? i.variationName === reqItem.variationName : true));
-                if (idx > -1) {
-                    newTicket[idx] = { ...newTicket[idx], qty: newTicket[idx].qty - reqItem.qty };
-                    if (newTicket[idx].qty <= 0) {
-                        newTicket.splice(idx, 1);
+            // Reduce quantities across potentially multiple variations
+            for (const reqItem of bundle.items) {
+                let qtyNeeded = reqItem.qty;
+                
+                for (let i = 0; i < newTicket.length; i++) {
+                    if (qtyNeeded <= 0) break;
+                    let item = newTicket[i];
+                    
+                    if (!item.isBundle && item.id === reqItem.productId && (reqItem.variationName ? item.variationName === reqItem.variationName : true)) {
+                        let qtyToTake = Math.min(item.qty, qtyNeeded);
+                        
+                        exactItemsConsumed.push({
+                            productId: item.id,
+                            variationName: item.variationName,
+                            qty: qtyToTake
+                        });
+                        
+                        newTicket[i] = { ...item, qty: item.qty - qtyToTake };
+                        qtyNeeded -= qtyToTake;
                     }
-                } else {
+                }
+                
+                if (qtyNeeded > 0) {
                     success = false; // Should not happen based on detector
                 }
-            });
+            }
+            
+            // Clean up rows that hit 0 qty
+            newTicket = newTicket.filter(item => item.qty > 0);
             
             if (success) {
                 // Add bundle row
@@ -384,7 +404,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                     price: bundle.bundlePrice,
                     qty: 1, // Always 1
                     isBundle: true,
-                    bundleItems: bundle.items
+                    bundleItems: exactItemsConsumed
                 });
                 showToast("Promo berhasil diterapkan!", "🎉");
                 return newTicket;

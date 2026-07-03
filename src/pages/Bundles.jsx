@@ -112,7 +112,8 @@ export default function Bundles() {
         if (!formData.bundlePrice || parseFloat(formData.bundlePrice) <= 0) return alert("Harga bundle tidak valid");
         
         const validItems = formData.items.filter(i => i.productId && parseInt(i.qty) > 0);
-        if (validItems.length < 2) return alert("Bundle minimal harus memiliki 2 produk");
+        const totalQty = validItems.reduce((sum, i) => sum + parseInt(i.qty), 0);
+        if (totalQty < 2) return alert("Bundle minimal harus memiliki kuantitas total 2 produk");
 
         const bundleToSave = {
             id: editingBundle ? editingBundle.id : undefined,
@@ -297,12 +298,11 @@ export default function Bundles() {
                                                     {hasVariations && (
                                                         <div className="w-[120px]">
                                                             <select
-                                                                required
-                                                                value={item.variationName}
+                                                                value={item.variationName || ""}
                                                                 onChange={e => handleItemChange(index, 'variationName', e.target.value)}
                                                                 className="w-full border-2 border-text rounded-lg p-1.5 text-sm bg-white cursor-pointer"
                                                             >
-                                                                <option value="">- Variasi -</option>
+                                                                <option value="">Semua Variasi (Campur)</option>
                                                                 {selectedProd.variations.map(v => (
                                                                     <option key={v.name} value={v.name}>{v.name}</option>
                                                                 ))}
@@ -322,7 +322,7 @@ export default function Bundles() {
                                                         />
                                                     </div>
                                                     
-                                                    {formData.items.length > 2 && (
+                                                    {formData.items.length > 1 && (
                                                         <button 
                                                             type="button"
                                                             onClick={() => handleRemoveItem(index)}

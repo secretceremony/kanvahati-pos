@@ -12,6 +12,7 @@ const Bundles = React.lazy(() => import('./pages/Bundles'));
 import Login from './pages/Login';
 
 import ReceiptModal from './components/ReceiptModal';
+import SystemBanner from './components/SystemBanner';
 import { t } from './services/translations';
 
 function Navigation() {
@@ -155,10 +156,11 @@ export default function App() {
 
     return (
         <BrowserRouter>
-            <div className="pos-container max-w-[1350px] mx-auto px-4 my-5 flex flex-col min-h-screen h-auto pb-12">
+            <div className="pos-app max-w-7xl mx-auto h-full flex flex-col pt-3 lg:pt-5 px-3 lg:px-5 relative z-10">
+                <SystemBanner />
                 
                 {/* Storefront Canopy Header */}
-                <header className="pos-header bg-white border-[3px] border-text rounded-[24px] shadow-card mb-5 overflow-hidden shrink-0">
+                <header className="pos-header bg-white border-[3px] border-text rounded-[24px] shadow-card mt-3 mb-5 overflow-hidden shrink-0">
                     <div className="canopy-stripes h-3 bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_35px,var(--color-white)_35px,var(--color-white)_70px)] border-b-[3px] border-text"></div>
                     <div className="header-content flex flex-col md:flex-row justify-between items-center p-3 md:px-5 gap-3">
                         
