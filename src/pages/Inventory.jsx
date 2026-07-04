@@ -31,7 +31,7 @@ export default function Inventory({ showToast }) {
 
     // Variations State
     const [hasVariations, setHasVariations] = useState(false);
-    const [variationsList, setVariationsList] = useState([{ name: '', price: '', stock: '10' }]);
+    const [variationsList, setVariationsList] = useState([{ name: '', price: '', stock: '10', discount: '0' }]);
 
     // Table UI State
     const [expandedProductId, setExpandedProductId] = useState(null);
@@ -237,7 +237,8 @@ export default function Inventory({ showToast }) {
             finalVariations = variationsList.map(v => ({
                 name: v.name.trim(),
                 price: parseFloat(v.price),
-                stock: parseInt(v.stock)
+                stock: parseInt(v.stock),
+                discount: parseFloat(v.discount || 0)
             }));
 
             // overall price defaults to first variation's price
@@ -255,6 +256,7 @@ export default function Inventory({ showToast }) {
             id,
             name,
             price: calculatedPrice,
+            discount: 0,
             category,
             stock: calculatedStock,
             tag,
@@ -355,12 +357,13 @@ export default function Inventory({ showToast }) {
             name: product.name,
             category: product.category,
             price: product.price.toString(),
+            discount: (product.discount || 0).toString(),
             stock: product.stock.toString(),
             tag: product.tag || '',
             hasVariations: product.variations && product.variations.length > 0,
             variationsList: product.variations && product.variations.length > 0 
-                ? product.variations.map(v => ({ name: v.name, price: v.price.toString(), stock: v.stock.toString() })) 
-                : [{ name: '', price: '', stock: '10' }]
+                ? product.variations.map(v => ({ name: v.name, price: v.price.toString(), stock: v.stock.toString(), discount: (v.discount || 0).toString() })) 
+                : [{ name: '', price: '', stock: '10', discount: '0' }]
         });
     };
 
@@ -379,7 +382,7 @@ export default function Inventory({ showToast }) {
     const handleAddEditVariationRow = () => {
         setEditingProduct(prev => ({
             ...prev,
-            variationsList: [...prev.variationsList, { name: '', price: '', stock: '10' }]
+            variationsList: [...prev.variationsList, { name: '', price: '', stock: '10', discount: '0' }]
         }));
     };
 
@@ -415,7 +418,8 @@ export default function Inventory({ showToast }) {
             finalVariations = editingProduct.variationsList.map(v => ({
                 name: v.name.trim(),
                 price: parseFloat(v.price),
-                stock: parseInt(v.stock)
+                stock: parseInt(v.stock),
+                discount: parseFloat(v.discount || 0)
             }));
 
             calculatedPrice = finalVariations[0].price;
@@ -431,6 +435,7 @@ export default function Inventory({ showToast }) {
             id: editingProduct.id,
             name: editingProduct.name,
             price: calculatedPrice,
+            discount: editingProduct.hasVariations ? 0 : parseFloat(editingProduct.discount || 0),
             category: editingProduct.category,
             stock: calculatedStock,
             tag: editingProduct.tag,
@@ -613,51 +618,66 @@ export default function Inventory({ showToast }) {
 
                                 <div className="max-h-[220px] overflow-y-auto flex flex-col gap-3 pr-1">
                                     {variationsList.map((row, idx) => (
-                                        <div key={idx} className="flex gap-2 items-center bg-yellow-light/20 border border-text/10 rounded-xl p-2.5 relative">
-                                            
-                                            <div className="flex flex-col gap-1 flex-grow">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Nama (e.g. Merah)" 
-                                                    required={hasVariations}
-                                                    value={row.name}
-                                                    onChange={(e) => handleVariationRowChange(idx, 'name', e.target.value)}
-                                                    className="border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-bold"
-                                                />
-                                            </div>
+                                        <div key={idx} className="flex flex-col gap-1.5 bg-yellow-light/20 border border-text/10 rounded-xl p-2.5 relative">
+                                            <div className="flex gap-2 items-center">
+                                                <div className="flex flex-col gap-1 flex-grow">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Nama (e.g. Merah)" 
+                                                        required={hasVariations}
+                                                        value={row.name}
+                                                        onChange={(e) => handleVariationRowChange(idx, 'name', e.target.value)}
+                                                        className="border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-bold"
+                                                    />
+                                                </div>
 
-                                            <div className="flex flex-col gap-1 w-[80px]">
+                                                <div className="flex flex-col gap-1 w-[80px]">
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="Harga" 
+                                                        required={hasVariations}
+                                                        value={row.price}
+                                                        onChange={(e) => handleVariationRowChange(idx, 'price', e.target.value)}
+                                                        className="border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-title font-bold"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-1 w-[60px]">
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="Stok" 
+                                                        required={hasVariations}
+                                                        value={row.stock}
+                                                        onChange={(e) => handleVariationRowChange(idx, 'stock', e.target.value)}
+                                                        className="border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-bold"
+                                                    />
+                                                </div>
+
+                                                {variationsList.length > 1 && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handleRemoveVariationRow(idx)}
+                                                        className="text-pink hover:scale-115 cursor-pointer ml-1 p-0.5"
+                                                        title="Hapus Baris"
+                                                    >
+                                                        <i className="fa-solid fa-xmark text-[14px]"></i>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 pl-0.5">
+                                                <i className="fa-solid fa-tag text-[9px] text-pink"></i>
                                                 <input 
                                                     type="number" 
-                                                    placeholder="Harga" 
-                                                    required={hasVariations}
-                                                    value={row.price}
-                                                    onChange={(e) => handleVariationRowChange(idx, 'price', e.target.value)}
-                                                    className="border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-title font-bold"
+                                                    placeholder="Diskon (Rp)" 
+                                                    min="0"
+                                                    value={row.discount}
+                                                    onChange={(e) => handleVariationRowChange(idx, 'discount', e.target.value)}
+                                                    className="border-2 border-pink/40 rounded-lg p-1 text-[10px] outline-none bg-pink-light/15 font-bold w-[100px] focus:border-pink"
                                                 />
+                                                {parseFloat(row.discount || 0) > 0 && parseFloat(row.price || 0) > 0 && (
+                                                    <span className="text-[9px] text-pink font-bold">→ {formatPrice(Math.max(0, parseFloat(row.price) - parseFloat(row.discount)))}</span>
+                                                )}
                                             </div>
-
-                                            <div className="flex flex-col gap-1 w-[60px]">
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="Stok" 
-                                                    required={hasVariations}
-                                                    value={row.stock}
-                                                    onChange={(e) => handleVariationRowChange(idx, 'stock', e.target.value)}
-                                                    className="border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-bold"
-                                                />
-                                            </div>
-
-                                            {variationsList.length > 1 && (
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => handleRemoveVariationRow(idx)}
-                                                    className="text-pink hover:scale-115 cursor-pointer ml-1 p-0.5"
-                                                    title="Hapus Baris"
-                                                >
-                                                    <i className="fa-solid fa-xmark text-[14px]"></i>
-                                                </button>
-                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -831,8 +851,18 @@ export default function Inventory({ showToast }) {
                                                     )}
                                                 </td>
                                                 <td className="p-3 font-title text-[12px] font-bold text-text">
-                                                    {formatPrice(hasVars ? Math.min(...prod.variations.map(v => v.price)) : prod.price)}
-                                                    {hasVars && <span className="text-[9px] block font-body opacity-70">(Mulai dari)</span>}
+                                                    {(prod.discount || 0) > 0 && !hasVars ? (
+                                                        <div className="flex flex-col">
+                                                            <span className="line-through opacity-50 text-[10px]">{formatPrice(prod.price)}</span>
+                                                            <span className="text-pink">{formatPrice(Math.max(0, prod.price - prod.discount))}</span>
+                                                            <span className="text-[8px] bg-pink text-white px-1.5 py-0.5 rounded-full w-fit mt-0.5 font-bold">-{formatPrice(prod.discount)}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            {formatPrice(hasVars ? Math.min(...prod.variations.map(v => v.price)) : prod.price)}
+                                                            {hasVars && <span className="text-[9px] block font-body opacity-70">(Mulai dari)</span>}
+                                                        </>
+                                                    )}
                                                 </td>
                                                 <td className="p-3 font-bold">
                                                     <span className={`px-2 py-0.5 rounded-full border ${
@@ -892,11 +922,25 @@ export default function Inventory({ showToast }) {
                                                                 <span>Daftar Stok Variasi • {prod.name}</span>
                                                             </h5>
                                                             <div className="flex flex-col gap-2">
-                                                                {prod.variations.map((v, idx) => (
-                                                                    <div key={idx} className="flex justify-between items-center bg-blue-light/25 border border-text/15 rounded-lg p-2 text-xs text-text">
-                                                                        <span className="font-bold">{v.name}</span>
+                                                                {prod.variations.map((v, idx) => {
+                                                                    const vHasDiscount = (v.discount || 0) > 0;
+                                                                    return (
+                                                                    <div key={idx} className={`flex justify-between items-center border rounded-lg p-2 text-xs text-text ${vHasDiscount ? 'bg-pink-light/30 border-pink/30' : 'bg-blue-light/25 border-text/15'}`}>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-bold">{v.name}</span>
+                                                                            {vHasDiscount && (
+                                                                                <span className="text-[8px] bg-pink text-white px-1.5 py-0.5 rounded-full w-fit mt-0.5 font-bold">SALE -{formatPrice(v.discount)}</span>
+                                                                            )}
+                                                                        </div>
                                                                         <div className="flex items-center gap-3">
-                                                                            <span className="font-title font-bold text-text/95">{formatPrice(v.price)}</span>
+                                                                            {vHasDiscount ? (
+                                                                                <div className="flex flex-col items-end">
+                                                                                    <span className="font-title text-[10px] line-through opacity-50">{formatPrice(v.price)}</span>
+                                                                                    <span className="font-title font-bold text-pink">{formatPrice(Math.max(0, v.price - v.discount))}</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <span className="font-title font-bold text-text/95">{formatPrice(v.price)}</span>
+                                                                            )}
                                                                             <span className="font-bold opacity-80">Stok: {v.stock}</span>
                                                                             <button
                                                                                 onClick={() => handleRestockClick(prod, v.name)}
@@ -906,7 +950,8 @@ export default function Inventory({ showToast }) {
                                                                             </button>
                                                                         </div>
                                                                     </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -1065,6 +1110,7 @@ export default function Inventory({ showToast }) {
 
                             {/* Base Price and Stock (Shown only if no variations) */}
                             {!editingProduct.hasVariations ? (
+                                <>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="flex flex-col gap-1">
                                         <label className="text-[10px] font-bold uppercase text-text/80">Harga (Rupiah)</label>
@@ -1088,6 +1134,40 @@ export default function Inventory({ showToast }) {
                                         />
                                     </div>
                                 </div>
+
+                                {/* Per-item Discount Field */}
+                                <div className="flex flex-col gap-1 mt-1">
+                                    <label className="text-[10px] font-bold uppercase text-pink flex items-center gap-1">
+                                        <i className="fa-solid fa-tag"></i> Diskon per Item (Rp) — Cuci Gudang / Wholesale
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="number" 
+                                            min="0"
+                                            max={editingProduct.price || 0}
+                                            value={editingProduct.discount}
+                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, discount: e.target.value }))}
+                                            placeholder="0"
+                                            className="border-2 border-pink/60 rounded-xl p-2 text-xs outline-none bg-pink-light/20 font-bold flex-grow focus:border-pink"
+                                        />
+                                        {parseFloat(editingProduct.discount || 0) > 0 && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setEditingProduct(prev => ({ ...prev, discount: '0' }))}
+                                                className="text-[9px] bg-white text-pink border-2 border-pink rounded-full px-2.5 py-1 font-bold cursor-pointer hover:bg-pink-light transition-all shrink-0"
+                                            >
+                                                <i className="fa-solid fa-xmark"></i> Hapus Diskon
+                                            </button>
+                                        )}
+                                    </div>
+                                    {parseFloat(editingProduct.discount || 0) > 0 && parseFloat(editingProduct.price || 0) > 0 && (
+                                        <div className="text-[10px] text-pink font-bold bg-pink-light/30 rounded-lg px-2.5 py-1.5 mt-0.5 border border-pink/20">
+                                            Harga setelah diskon: <span className="text-text">{formatPrice(Math.max(0, parseFloat(editingProduct.price) - parseFloat(editingProduct.discount)))}</span>
+                                            <span className="opacity-60 ml-1">(hemat {Math.round((parseFloat(editingProduct.discount) / parseFloat(editingProduct.price)) * 100)}%)</span>
+                                        </div>
+                                    )}
+                                </div>
+                                </>
                             ) : (
                                 /* Variations dynamic lists */
                                 <div className="bg-blue-light/10 border-2 border-text rounded-xl p-3 flex flex-col gap-2 shadow-[2px_2px_0px_#32628f] shrink-0">
@@ -1104,51 +1184,66 @@ export default function Inventory({ showToast }) {
 
                                     <div className="max-h-[140px] overflow-y-auto flex flex-col gap-2 pr-1">
                                         {editingProduct.variationsList.map((row, idx) => (
-                                            <div key={idx} className="flex gap-2 items-center bg-white border border-text/10 rounded-lg p-2 relative">
-                                                
-                                                <div className="flex flex-col gap-0.5 flex-grow">
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Nama" 
-                                                        required={editingProduct.hasVariations}
-                                                        value={row.name}
-                                                        onChange={(e) => handleEditVariationRowChange(idx, 'name', e.target.value)}
-                                                        className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
-                                                    />
-                                                </div>
+                                            <div key={idx} className="flex flex-col gap-1.5 bg-white border border-text/10 rounded-lg p-2 relative">
+                                                <div className="flex gap-2 items-center">
+                                                    <div className="flex flex-col gap-0.5 flex-grow">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Nama" 
+                                                            required={editingProduct.hasVariations}
+                                                            value={row.name}
+                                                            onChange={(e) => handleEditVariationRowChange(idx, 'name', e.target.value)}
+                                                            className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
+                                                        />
+                                                    </div>
 
-                                                <div className="flex flex-col gap-0.5 w-[70px]">
+                                                    <div className="flex flex-col gap-0.5 w-[70px]">
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder="Harga" 
+                                                            required={editingProduct.hasVariations}
+                                                            value={row.price}
+                                                            onChange={(e) => handleEditVariationRowChange(idx, 'price', e.target.value)}
+                                                            className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-0.5 w-[55px]">
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder="Stok" 
+                                                            required={editingProduct.hasVariations}
+                                                            value={row.stock}
+                                                            onChange={(e) => handleEditVariationRowChange(idx, 'stock', e.target.value)}
+                                                            className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
+                                                        />
+                                                    </div>
+
+                                                    {editingProduct.variationsList.length > 1 && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleRemoveEditVariationRow(idx)}
+                                                            className="text-pink hover:scale-115 cursor-pointer ml-1 p-0.5"
+                                                            title="Hapus Baris"
+                                                        >
+                                                            <i className="fa-solid fa-xmark text-[12px]"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 pl-0.5">
+                                                    <i className="fa-solid fa-tag text-[8px] text-pink"></i>
                                                     <input 
                                                         type="number" 
-                                                        placeholder="Harga" 
-                                                        required={editingProduct.hasVariations}
-                                                        value={row.price}
-                                                        onChange={(e) => handleEditVariationRowChange(idx, 'price', e.target.value)}
-                                                        className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
+                                                        placeholder="Diskon (Rp)" 
+                                                        min="0"
+                                                        value={row.discount}
+                                                        onChange={(e) => handleEditVariationRowChange(idx, 'discount', e.target.value)}
+                                                        className="border-2 border-pink/40 rounded-lg p-0.5 text-[10px] outline-none bg-pink-light/15 font-bold w-[90px] focus:border-pink"
                                                     />
+                                                    {parseFloat(row.discount || 0) > 0 && parseFloat(row.price || 0) > 0 && (
+                                                        <span className="text-[9px] text-pink font-bold">→ {formatPrice(Math.max(0, parseFloat(row.price) - parseFloat(row.discount)))}</span>
+                                                    )}
                                                 </div>
-
-                                                <div className="flex flex-col gap-0.5 w-[55px]">
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="Stok" 
-                                                        required={editingProduct.hasVariations}
-                                                        value={row.stock}
-                                                        onChange={(e) => handleEditVariationRowChange(idx, 'stock', e.target.value)}
-                                                        className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
-                                                    />
-                                                </div>
-
-                                                {editingProduct.variationsList.length > 1 && (
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => handleRemoveEditVariationRow(idx)}
-                                                        className="text-pink hover:scale-115 cursor-pointer ml-1 p-0.5"
-                                                        title="Hapus Baris"
-                                                    >
-                                                        <i className="fa-solid fa-xmark text-[12px]"></i>
-                                                    </button>
-                                                )}
                                             </div>
                                         ))}
                                     </div>

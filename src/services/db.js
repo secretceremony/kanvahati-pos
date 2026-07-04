@@ -214,6 +214,7 @@ export const saveProduct = async (product) => {
         id: product.id.trim().toUpperCase(),
         name: product.name.trim(),
         price: parseFloat(product.price || 0),
+        discount: parseFloat(product.discount || 0),
         category: product.category || 'stickers',
         stock: parseInt(product.stock || 0),
         img: product.img || 'assets/mascot.png',
@@ -458,6 +459,8 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier, app
             id: item.id,
             name: item.name,
             price: item.price,
+            originalPrice: item.originalPrice || item.price,
+            discount: item.discount || 0,
             qty: item.qty,
             variationName: item.variationName || null,
             fromBundle: item.fromBundle || null

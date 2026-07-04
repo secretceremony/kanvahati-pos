@@ -27,12 +27,14 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
             </div>
             <hr style="border: none; border-top: 1.5px dashed #000; margin: 12px 0;" />
             <div style="font-size: 12px; line-height: 1.6;">
-                ${(transaction.items || []).map(item => `
+                ${(transaction.items || []).map(item => {
+                    const hasDiscount = (item.discount || 0) > 0;
+                    return `
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                        <span style="flex: 1; padding-right: 10px;">${item.qty}x ${item.name}</span>
+                        <span style="flex: 1; padding-right: 10px;">${item.qty}x ${item.name}${hasDiscount ? ` <span style="color: #d81b60; font-size: 10px;">(disc -Rp ${item.discount.toLocaleString('id-ID')}/pcs)</span>` : ''}</span>
                         <span style="font-weight: bold; white-space: nowrap;">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</span>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
             <hr style="border: none; border-top: 1.5px dashed #000; margin: 12px 0;" />
             <div style="font-size: 12px; line-height: 1.5;">
@@ -155,12 +157,20 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
 
                     {/* Items Purchased */}
                     <div className="receipt-items flex flex-col gap-2 text-[12px]">
-                        {transaction.items && transaction.items.map((item, idx) => (
-                            <div key={idx} className="r-item-line flex justify-between">
-                                <span className="r-item-title">{item.qty}x {item.name}</span>
-                                <span className="r-item-total font-bold">{formatReceiptMoney(item.price * item.qty)}</span>
-                            </div>
-                        ))}
+                        {transaction.items && transaction.items.map((item, idx) => {
+                            const hasDiscount = (item.discount || 0) > 0;
+                            return (
+                                <div key={idx} className="r-item-line flex justify-between">
+                                    <span className="r-item-title flex flex-col">
+                                        <span>{item.qty}x {item.name}</span>
+                                        {hasDiscount && (
+                                            <span className="text-[9px] text-pink font-bold">disc -{formatReceiptMoney(item.discount)}/pcs</span>
+                                        )}
+                                    </span>
+                                    <span className="r-item-total font-bold">{formatReceiptMoney(item.price * item.qty)}</span>
+                                </div>
+                            );
+                        })}
                     </div>
 
                     <div className="receipt-divider border-t-2 border-dashed border-text my-2.5"></div>

@@ -64,6 +64,15 @@ export const t = {
     invalidPrice: "Masukkan harga yang valid!",
     addSuccess: "Produk berhasil ditambahkan!",
     deleteSuccess: "Produk berhasil dihapus!",
+    discountLabel: "Diskon",
+    discountPerItem: "Diskon per Item",
+    setDiscount: "Set Diskon",
+    removeDiscount: "Hapus Diskon",
+    discountAmount: "Jumlah Diskon (Rp)",
+    discountApplied: "Diskon diterapkan!",
+    discountRemoved: "Diskon dihapus!",
+    afterDiscount: "Setelah diskon",
+    itemDiscount: "Diskon Item",
     
     // Bundle/Promo specific keys
     promo: "Promo",
