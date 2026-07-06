@@ -87,3 +87,9 @@ body::before {
 .title-stroke {
   -webkit-text-stroke: 0.5px var(--color-text);
 }
+
+/* --- Rekapan expand animation --- */
+@keyframes fadeSlideIn {
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}

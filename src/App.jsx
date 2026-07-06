@@ -9,6 +9,7 @@ const Stats = React.lazy(() => import('./pages/Stats'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
 const CashDrawer = React.lazy(() => import('./pages/CashDrawer'));
 const Bundles = React.lazy(() => import('./pages/Bundles'));
+const Rekapan = React.lazy(() => import('./pages/Rekapan'));
 import Login from './pages/Login';
 
 import ReceiptModal from './components/ReceiptModal';
@@ -68,6 +69,14 @@ function Navigation() {
                 }`}
             >
                 <i className="fa-solid fa-tags"></i> {t.promo}
+            </Link>
+            <Link 
+                to="/rekapan"
+                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
+                    currentPath === '/rekapan' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
+                }`}
+            >
+                <i className="fa-solid fa-file-invoice-dollar"></i> {t.recap || "Rekapan"}
             </Link>
         </div>
     );
@@ -226,6 +235,7 @@ export default function App() {
                             <Route path="/statistik" element={<Stats />} />
                             <Route path="/stok" element={<Inventory showToast={showToast} />} />
                             <Route path="/promo" element={<Bundles />} />
+                            <Route path="/rekapan" element={<Rekapan showToast={showToast} />} />
                         </Routes>
                     </React.Suspense>
                 </main>

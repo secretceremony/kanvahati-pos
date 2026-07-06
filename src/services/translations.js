@@ -87,5 +87,13 @@ export const t = {
     skipBundle: "Lewati",
     bundleAvailable: "Promo Tersedia!",
     active: "Aktif",
-    inactive: "Nonaktif"
+    inactive: "Nonaktif",
+    
+    // Rekapan (Recap) specific keys
+    recap: "Rekapan",
+    recapSubtitle: "Rangkuman transaksi per hari, minggu, atau bulan.",
+    exportExcel: "Export ke Excel",
+    daily: "Harian",
+    weekly: "Mingguan",
+    monthly: "Bulanan"
 };
