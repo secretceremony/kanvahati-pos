@@ -2,11 +2,16 @@
   "name": "kanvahati-pos",
   "private": true,
   "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/full-functional-qa.test.mjs tests/booth-simulation.test.mjs tests/visitor-display-sync.test.mjs tests/host-console-integration.test.mjs tests/arcade-core-and-data.test.mjs tests/arcade-spec.test.mjs tests/pos-regression.test.mjs tests/security-rules.test.mjs",
+    "test:emulator": "firebase emulators:exec --only firestore 'node tests/security-rules-emulator.test.mjs'",
+    "test:all": "npm run test && npm run test:emulator",
+    "screenshots": "node scripts/capture-real-screenshots.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
@@ -18,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -25,6 +31,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "playwright": "^1.64.0",
     "vite": "^8.0.12"
   }
 }

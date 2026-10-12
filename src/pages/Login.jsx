@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
+import { loginWithEmail } from '../services/auth';
 
 export default function Login({ onLoginSuccess, showToast }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const targetEmail = "folks@itk.ac.id";
-        const targetPassword = "FOLKS2026";
+        setLoading(true);
 
-        if (email.trim().toLowerCase() === targetEmail && password === targetPassword) {
-            showToast("Selamat datang kembali! Login berhasil.", "🎉");
-            onLoginSuccess();
-        } else {
-            showToast("Email atau password salah!", "⚠️");
+        try {
+            const { user, role } = await loginWithEmail(email, password);
+            showToast(`Selamat datang! Masuk sebagai ${role.toUpperCase()}.`, "🎉");
+            onLoginSuccess(user, role);
+        } catch (error) {
+            showToast(error.message, "⚠️");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -83,9 +87,12 @@ export default function Login({ onLoginSuccess, showToast }) {
                     {/* Submit Button */}
                     <button 
                         type="submit"
-                        className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] py-3 mt-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold"
+                        disabled={loading}
+                        className={`btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] py-3 mt-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold ${
+                            loading ? 'opacity-60 cursor-not-allowed' : ''
+                        }`}
                     >
-                        <span>Masuk ke POS</span> <i className="fa-solid fa-right-to-bracket text-xs"></i>
+                        <span>{loading ? "Memverifikasi..." : "Masuk ke POS"}</span> <i className={`fa-solid ${loading ? "fa-spinner fa-spin" : "fa-right-to-bracket"} text-xs`}></i>
                     </button>
                 </form>
 

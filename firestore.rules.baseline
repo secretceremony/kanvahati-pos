@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // SECURE POS BASELINE (FAIL-CLOSED ROLLBACK RULES)
+    // Used if Arcade features must be rolled back, ensuring POS remains secure.
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getRole() {
+      return request.auth.token.role != null
+        ? request.auth.token.role
+        : (exists(/databases/$(database)/documents/staff_roles/$(request.auth.uid))
+            ? get(/databases/$(database)/documents/staff_roles/$(request.auth.uid)).data.role
+            : null);
+    }
+
+    function isCashier() {
+      return isAuthenticated() && (getRole() == 'cashier' || getRole() == 'admin');
+    }
+
+    // POS Collections
+    match /staff_roles/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /products/{productId} {
+      allow read, write: if isCashier();
+    }
+
+    match /categories/{categoryId} {
+      allow read, write: if isCashier();
+    }
+
+    match /transactions/{txId} {
+      allow read, write: if isCashier();
+    }
+
+    match /cash_drawer/{drawerId} {
+      allow read, write: if isCashier();
+    }
+
+    // ALL ARCADE COLLECTIONS SAFELY DISABLED IN BASELINE
+    match /arcade_questions/{document=**} {
+      allow read, write: if false;
+    }
+    match /arcade_secrets/{document=**} {
+      allow read, write: if false;
+    }
+    match /arcade_sessions/{document=**} {
+      allow read, write: if false;
+    }
+    match /arcade_participants/{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

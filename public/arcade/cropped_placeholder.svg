@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#E7F2FC" stroke="#32628F" stroke-width="8" rx="20"/>
+  <rect x="40" y="40" width="320" height="320" fill="#FAF0C4" stroke="#32628F" stroke-width="4" stroke-dasharray="8 8" rx="12"/>
+  <circle cx="200" cy="180" r="70" fill="#F79DC3" stroke="#32628F" stroke-width="6"/>
+  <path d="M 170 170 Q 200 130 230 170" fill="none" stroke="#32628F" stroke-width="6" stroke-linecap="round"/>
+  <text x="200" y="300" font-family="sans-serif" font-size="20" font-weight="bold" fill="#32628F" text-anchor="middle">CROPPED SAMPLE</text>
+  <text x="200" y="330" font-family="sans-serif" font-size="13" fill="#32628F" text-anchor="middle">Kanvahati Arcade Testing Asset</text>
+</svg>
