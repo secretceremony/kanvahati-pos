@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#FCE6F1" stroke="#32628F" stroke-width="8" rx="20"/>
+  <rect x="30" y="30" width="340" height="340" fill="#FFFFFF" stroke="#32628F" stroke-width="4" rx="16"/>
+  <circle cx="200" cy="180" r="90" fill="#F79DC3" stroke="#32628F" stroke-width="6"/>
+  <circle cx="170" cy="160" r="12" fill="#32628F"/>
+  <circle cx="230" cy="160" r="12" fill="#32628F"/>
+  <path d="M 175 210 Q 200 240 225 210" fill="none" stroke="#32628F" stroke-width="6" stroke-linecap="round"/>
+  <text x="200" y="320" font-family="sans-serif" font-size="22" font-weight="bold" fill="#32628F" text-anchor="middle">REVEALED CHARACTER</text>
+  <text x="200" y="345" font-family="sans-serif" font-size="13" fill="#32628F" text-anchor="middle">Sousou no Frieren (Sample)</text>
+</svg>

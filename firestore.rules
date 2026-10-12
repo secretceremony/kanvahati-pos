@@ -1,8 +1,111 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // =========================================================================
+    // HELPER FUNCTIONS: AUTHENTICATION & ROLE-BASED ACCESS CONTROL (RBAC)
+    // =========================================================================
+    
+    // Check if user is authenticated via Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Retrieve user role from Firebase Auth Custom Claims or staff_roles collection
+    function getRole() {
+      return request.auth.token.role != null
+        ? request.auth.token.role
+        : (exists(/databases/$(database)/documents/staff_roles/$(request.auth.uid))
+            ? get(/databases/$(database)/documents/staff_roles/$(request.auth.uid)).data.role
+            : null);
+    }
+
+    // Role checks (No domain assumptions, role is assigned strictly via trusted server)
+    function isAdmin() {
+      return isAuthenticated() && getRole() == 'admin';
+    }
+
+    function isCashier() {
+      return isAuthenticated() && (getRole() == 'cashier' || getRole() == 'admin');
+    }
+
+    function isArcadeHost() {
+      return isAuthenticated() && (getRole() == 'arcade_host' || getRole() == 'admin');
+    }
+
+    function isDisplay() {
+      return isAuthenticated() && (getRole() == 'arcade_display' || getRole() == 'admin' || getRole() == 'arcade_host');
+    }
+
+    // =========================================================================
+    // 1. STAFF ROLES (Server-Controlled Identity Mapping)
+    // =========================================================================
+    match /staff_roles/{userId} {
+      // User can read their own role assignment; Admin can inspect all
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      // Absolutely no client-side write! Roles must be assigned server-side via Admin SDK
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // 2. KANVAHATI POS COLLECTIONS (Authenticated Staff Only - No Public Access)
+    // =========================================================================
+    match /products/{productId} {
+      allow read: if isCashier();
+      allow write: if isCashier();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isCashier();
+      allow write: if isCashier();
+    }
+
+    match /transactions/{txId} {
+      allow read: if isCashier();
+      allow create: if isCashier();
+      allow update, delete: if isCashier(); // Refund & cancel transactions
+    }
+
+    match /cash_drawer/{drawerId} {
+      allow read, write: if isCashier();
+    }
+
+    // =========================================================================
+    // 3. KANVAHATI ARCADE: QUESTION METADATA (Prompts & Media Only)
+    // =========================================================================
+    match /arcade_questions/{questionId} {
+      // Host and Admin can read and manage questions
+      allow read, write: if isArcadeHost();
+    }
+
+    // =========================================================================
+    // 4. KANVAHATI ARCADE: SECRET ANSWER KEYS (Document-Level Separation)
+    // =========================================================================
+    match /arcade_secrets/{secretId} {
+      // Strictly restricted to Arcade Host and Admin.
+      // Display devices have ZERO access to secret answers!
+      allow read, write: if isArcadeHost();
+    }
+
+    // =========================================================================
+    // 5. KANVAHATI ARCADE: ACTIVE SESSIONS (Real-time Dual-View)
+    // =========================================================================
+    match /arcade_sessions/{stationKey} {
+      // Display and Host can read active game session (timer, prompt, status)
+      allow read: if isDisplay();
+      // Only Host and Admin can control, update, and validate sessions
+      allow write: if isArcadeHost();
+    }
+
+    // =========================================================================
+    // 6. KANVAHATI ARCADE: PARTICIPANTS & PRIZE CLAIM RECORDS
+    // =========================================================================
+    match /arcade_participants/{participantKey} {
+      // Strictly private: only Host and Admin can create and inspect participants
+      allow read: if isArcadeHost();
+      allow create: if isArcadeHost();
+      allow update: if isArcadeHost(); // Confirming prize claim
+      allow delete: if isAdmin(); // Only Admin can delete participant logs
     }
   }
 }

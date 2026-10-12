@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { loginWithEmail } from '../services/auth';
 
 export default function Login({ onLoginSuccess, showToast }) {
     const [email, setEmail] = useState('');
@@ -13,19 +12,11 @@ export default function Login({ onLoginSuccess, showToast }) {
         setIsLoading(true);
 
         try {
-            await signInWithEmailAndPassword(auth, email.trim(), password);
-            showToast("Selamat datang kembali! Login berhasil.", "🎉");
-            onLoginSuccess();
+            const { user, role } = await loginWithEmail(email, password);
+            showToast(`Selamat datang! Masuk sebagai ${role.toUpperCase()}.`, "🎉");
+            onLoginSuccess(user, role);
         } catch (error) {
-            let message = "Email atau password salah!";
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                message = "Email atau password salah!";
-            } else if (error.code === 'auth/too-many-requests') {
-                message = "Terlalu banyak percobaan. Coba lagi nanti.";
-            } else if (error.code === 'auth/network-request-failed') {
-                message = "Koneksi gagal. Periksa internet Anda.";
-            }
-            showToast(message, "⚠️");
+            showToast(error.message, "⚠️");
         } finally {
             setIsLoading(false);
         }
@@ -95,16 +86,15 @@ export default function Login({ onLoginSuccess, showToast }) {
                         </div>
                     </div>
 
-                    {/* Submit Button */}
                     <button 
-                        type="submit"
+                        type="submit" 
                         disabled={isLoading}
                         className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] py-3 mt-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-btn disabled:hover:bg-pink"
                     >
                         {isLoading ? (
                             <>
                                 <i className="fa-solid fa-spinner fa-spin text-xs"></i>
-                                <span>Memproses...</span>
+                                <span>Memverifikasi...</span>
                             </>
                         ) : (
                             <>
