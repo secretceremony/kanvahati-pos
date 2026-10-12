@@ -63,5 +63,37 @@ export const t = {
     restock: "Isi Stok",
     invalidPrice: "Masukkan harga yang valid!",
     addSuccess: "Produk berhasil ditambahkan!",
-    deleteSuccess: "Produk berhasil dihapus!"
+    deleteSuccess: "Produk berhasil dihapus!",
+    discountLabel: "Diskon",
+    discountPerItem: "Diskon per Item",
+    setDiscount: "Set Diskon",
+    removeDiscount: "Hapus Diskon",
+    discountAmount: "Jumlah Diskon (Rp)",
+    discountApplied: "Diskon diterapkan!",
+    discountRemoved: "Diskon dihapus!",
+    afterDiscount: "Setelah diskon",
+    itemDiscount: "Diskon Item",
+    
+    // Bundle/Promo specific keys
+    promo: "Promo",
+    bundles: "Paket Bundle",
+    addBundle: "Buat Bundle",
+    bundleName: "Nama Paket",
+    bundlePrice: "Harga Paket",
+    originalPrice: "Harga Asli",
+    discount: "Hemat",
+    bundleItems: "Isi Paket",
+    applyBundle: "Pakai Bundle",
+    skipBundle: "Lewati",
+    bundleAvailable: "Promo Tersedia!",
+    active: "Aktif",
+    inactive: "Nonaktif",
+    
+    // Rekapan (Recap) specific keys
+    recap: "Rekapan",
+    recapSubtitle: "Rangkuman transaksi per hari, minggu, atau bulan.",
+    exportExcel: "Export ke Excel",
+    daily: "Harian",
+    weekly: "Mingguan",
+    monthly: "Bulanan"
 };

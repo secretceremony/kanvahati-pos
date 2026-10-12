@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 
 const Register = React.lazy(() => import('./pages/Register'));
@@ -6,13 +6,17 @@ const Logs = React.lazy(() => import('./pages/Logs'));
 const Stats = React.lazy(() => import('./pages/Stats'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
 const CashDrawer = React.lazy(() => import('./pages/CashDrawer'));
+const Bundles = React.lazy(() => import('./pages/Bundles'));
+const Rekapan = React.lazy(() => import('./pages/Rekapan'));
 const HostConsole = React.lazy(() => import('./arcade/pages/HostConsole'));
 const VisitorDisplay = React.lazy(() => import('./arcade/pages/VisitorDisplay'));
 const QuestionBankManager = React.lazy(() => import('./arcade/pages/QuestionBankManager'));
-import Login from './pages/Login';
 
+import Login from './pages/Login';
 import ReceiptModal from './components/ReceiptModal';
+import SystemBanner from './components/SystemBanner';
 import { t } from './services/translations';
+import { subscribeAuthState, logoutUser } from './services/auth';
 
 function Navigation() {
     const location = useLocation();
@@ -61,6 +65,22 @@ function Navigation() {
                 <i className="fa-solid fa-boxes-stacked"></i> {t.inventory}
             </Link>
             <Link 
+                to="/promo"
+                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
+                    currentPath === '/promo' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
+                }`}
+            >
+                <i className="fa-solid fa-tags"></i> {t.promo || "Promo"}
+            </Link>
+            <Link 
+                to="/rekapan"
+                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
+                    currentPath === '/rekapan' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
+                }`}
+            >
+                <i className="fa-solid fa-file-invoice-dollar"></i> {t.recap || "Rekapan"}
+            </Link>
+            <Link 
                 to="/arcade/host"
                 className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
                     currentPath.startsWith('/arcade') ? 'bg-pink border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-pink-light hover:border-text'
@@ -71,8 +91,6 @@ function Navigation() {
         </div>
     );
 }
-
-import { subscribeAuthState, logoutUser } from './services/auth';
 
 function MainRoutes({
     currentUser,
@@ -104,6 +122,7 @@ function MainRoutes({
 
     return (
         <div className="pos-container max-w-[1350px] mx-auto px-4 my-5 flex flex-col min-h-screen h-auto pb-12">
+            <SystemBanner />
             {/* Storefront Canopy Header */}
             <header className="pos-header bg-white border-[3px] border-text rounded-[24px] shadow-card mb-5 overflow-hidden shrink-0">
                 <div className="canopy-stripes h-3 bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_35px,var(--color-white)_35px,var(--color-white)_70px)] border-b-[3px] border-text"></div>
@@ -166,6 +185,8 @@ function MainRoutes({
                         <Route path="/riwayat" element={<Logs onReprint={handleReprint} showToast={showToast} />} />
                         <Route path="/statistik" element={<Stats />} />
                         <Route path="/stok" element={<Inventory showToast={showToast} />} />
+                        <Route path="/promo" element={<Bundles />} />
+                        <Route path="/rekapan" element={<Rekapan showToast={showToast} />} />
                         <Route path="/arcade/host" element={<HostConsole currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
                         <Route path="/arcade/questions" element={<QuestionBankManager currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
@@ -195,7 +216,7 @@ export default function App() {
     const [userRole, setUserRole] = useState(null);
     const [authLoading, setAuthLoading] = useState(true);
 
-    React.useEffect(() => {
+    useEffect(() => {
         // Support QA automated testing / demo role parameter
         const search = typeof window !== 'undefined' ? window.location.search : '';
         const params = new URLSearchParams(search);

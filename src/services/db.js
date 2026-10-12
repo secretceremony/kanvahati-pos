@@ -47,6 +47,16 @@ export const isUsingFirebase = () => {
     return isFirebaseConfigured;
 };
 
+// System config updater to notify other clients of data changes
+export const triggerDataUpdate = async () => {
+    if (!isUsingFirebase()) return;
+    try {
+        await setDoc(doc(db, "system", "config"), { lastDataUpdate: Date.now() }, { merge: true });
+    } catch (e) {
+        console.error("Failed to trigger data update", e);
+    }
+};
+
 // --- Custom Categories Management ---
 export const getCategories = async (forceRefetch = false) => {
     if (cacheCategories && !forceRefetch) {
@@ -109,6 +119,7 @@ export const saveCategory = async (categoryName) => {
     }
     try {
         await setDoc(doc(db, "categories", cleanCat), { name: cleanCat });
+        await triggerDataUpdate();
         return cleanCat;
     } catch (e) {
         console.error("Firestore write category failed. Saving locally.", e);
@@ -137,6 +148,7 @@ export const deleteCategory = async (categoryName) => {
     }
     try {
         await deleteDoc(doc(db, "categories", cleanCat));
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore delete category failed. Deleting locally.", e);
@@ -202,6 +214,7 @@ export const saveProduct = async (product) => {
         id: product.id.trim().toUpperCase(),
         name: product.name.trim(),
         price: parseFloat(product.price || 0),
+        discount: parseFloat(product.discount || 0),
         category: product.category || 'stickers',
         stock: parseInt(product.stock || 0),
         img: product.img || 'assets/mascot.png',
@@ -234,6 +247,7 @@ export const saveProduct = async (product) => {
 
     try {
         await setDoc(doc(db, "products", cleanProduct.id), cleanProduct);
+        await triggerDataUpdate();
         return cleanProduct;
     } catch (e) {
         console.error("Firestore write product failed. Saving locally.", e);
@@ -251,6 +265,16 @@ export const saveProduct = async (product) => {
 
 // Delete product
 export const deleteProduct = async (productId) => {
+    // Check if product is in any active bundle and deactivate it
+    const bundles = await getBundles();
+    for (const bundle of bundles) {
+        if (bundle.isActive && bundle.items.some(item => item.productId === productId)) {
+            console.warn(`Deactivating bundle ${bundle.name} because product ${productId} was deleted.`);
+            bundle.isActive = false;
+            await saveBundle(bundle);
+        }
+    }
+
     // Update in-memory cache first
     if (cacheProducts) {
         cacheProducts = cacheProducts.filter(p => p.id !== productId);
@@ -265,6 +289,7 @@ export const deleteProduct = async (productId) => {
 
     try {
         await deleteDoc(doc(db, "products", productId));
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore delete product failed. Deleting locally.", e);
@@ -278,6 +303,16 @@ export const deleteProduct = async (productId) => {
 // Bulk Delete products
 export const deleteProductsBulk = async (productIds) => {
     if (!productIds || productIds.length === 0) return true;
+
+    // Check if products are in any active bundle and deactivate them
+    const bundles = await getBundles();
+    for (const bundle of bundles) {
+        if (bundle.isActive && bundle.items.some(item => productIds.includes(item.productId))) {
+            console.warn(`Deactivating bundle ${bundle.name} because a containing product was bulk deleted.`);
+            bundle.isActive = false;
+            await saveBundle(bundle);
+        }
+    }
 
     // Update in-memory cache first
     if (cacheProducts) {
@@ -297,6 +332,7 @@ export const deleteProductsBulk = async (productIds) => {
             batch.delete(doc(db, "products", id));
         });
         await batch.commit();
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore bulk delete failed. Deleting locally.", e);
@@ -414,7 +450,7 @@ export const getTransactionsList = async (forceRefetch = false) => {
 };
 
 // Save a new transaction (decrements variation stock if matching)
-export const saveTransaction = async (items, totals, paymentMethod, cashier) => {
+export const saveTransaction = async (items, totals, paymentMethod, cashier, appliedBundles = []) => {
     const txId = "TX-" + Math.floor(100000 + Math.random() * 900000);
     const newTx = {
         id: txId,
@@ -423,9 +459,13 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier) => 
             id: item.id,
             name: item.name,
             price: item.price,
+            originalPrice: item.originalPrice || item.price,
+            discount: item.discount || 0,
             qty: item.qty,
-            variationName: item.variationName || null
+            variationName: item.variationName || null,
+            fromBundle: item.fromBundle || null
         })),
+        appliedBundles: appliedBundles,
         qty: totals.qty,
         subtotal: totals.subtotal,
         total: totals.total,
@@ -838,6 +878,109 @@ export const updateCategoryName = async (oldName, newName) => {
             });
             localStorage.setItem(LOCAL_PRODS_KEY, JSON.stringify(prods));
         }
+        return true;
+    }
+};
+
+// --- BUNDLES MANAGEMENT ---
+
+const LOCAL_BUNDLES_KEY = 'kanvahati_pos_local_bundles_idr';
+let cacheBundles = null;
+
+const getLocalBundles = () => {
+    const stored = localStorage.getItem(LOCAL_BUNDLES_KEY);
+    return stored ? JSON.parse(stored) : [];
+};
+
+export const getBundles = async (forceRefetch = false) => {
+    if (cacheBundles && !forceRefetch) {
+        return [...cacheBundles];
+    }
+
+    let bundles = [];
+    if (!isFirebaseConfigured) {
+        bundles = getLocalBundles();
+    } else {
+        try {
+            const querySnapshot = await getDocs(collection(db, "bundles"));
+            querySnapshot.forEach(doc => {
+                bundles.push(doc.data());
+            });
+        } catch (e) {
+            console.warn("Firestore read bundles failed, using local fallback.", e);
+            bundles = getLocalBundles();
+        }
+    }
+
+    cacheBundles = bundles;
+    return [...cacheBundles];
+};
+
+export const saveBundle = async (bundle) => {
+    const cleanBundle = {
+        id: bundle.id || "BDL-" + Math.floor(100000 + Math.random() * 900000),
+        name: bundle.name.trim(),
+        items: bundle.items.map(item => ({
+            productId: item.productId,
+            variationName: item.variationName || null,
+            qty: parseInt(item.qty || 1)
+        })),
+        bundlePrice: parseFloat(bundle.bundlePrice || 0),
+        isActive: bundle.isActive !== undefined ? bundle.isActive : true,
+        createdAt: bundle.createdAt || new Date().toISOString()
+    };
+
+    if (cacheBundles) {
+        const existingIdx = cacheBundles.findIndex(b => b.id === cleanBundle.id);
+        if (existingIdx > -1) cacheBundles[existingIdx] = cleanBundle;
+        else cacheBundles.push(cleanBundle);
+    }
+
+    if (!isFirebaseConfigured) {
+        const localBundles = getLocalBundles();
+        const existingIdx = localBundles.findIndex(b => b.id === cleanBundle.id);
+        if (existingIdx > -1) localBundles[existingIdx] = cleanBundle;
+        else localBundles.push(cleanBundle);
+        localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify(localBundles));
+        return cleanBundle;
+    }
+
+    try {
+        await setDoc(doc(db, "bundles", cleanBundle.id), cleanBundle);
+        await triggerDataUpdate();
+        return cleanBundle;
+    } catch (e) {
+        console.error("Firestore write bundle failed. Saving locally.", e);
+        const localBundles = getLocalBundles();
+        const existingIdx = localBundles.findIndex(b => b.id === cleanBundle.id);
+        if (existingIdx > -1) localBundles[existingIdx] = cleanBundle;
+        else localBundles.push(cleanBundle);
+        localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify(localBundles));
+        return cleanBundle;
+    }
+};
+
+export const deleteBundle = async (bundleId) => {
+    if (cacheBundles) {
+        cacheBundles = cacheBundles.filter(b => b.id !== bundleId);
+    }
+
+    if (!isFirebaseConfigured) {
+        const localBundles = getLocalBundles();
+        const filtered = localBundles.filter(b => b.id !== bundleId);
+        localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify(filtered));
+        return true;
+    }
+
+    try {
+        await deleteDoc(doc(db, "bundles", bundleId));
+        await triggerDataUpdate();
+        return true;
+    } catch (e) {
+        console.error("Firestore delete bundle failed. Deleting locally.", e);
+        const localBundles = getLocalBundles();
+        const filtered = localBundles.filter(b => b.id !== bundleId);
+        localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify(filtered));
         return true;
     }
 };

@@ -5,11 +5,11 @@ export default function Login({ onLoginSuccess, showToast }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
+        setIsLoading(true);
 
         try {
             const { user, role } = await loginWithEmail(email, password);
@@ -18,7 +18,7 @@ export default function Login({ onLoginSuccess, showToast }) {
         } catch (error) {
             showToast(error.message, "⚠️");
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -56,7 +56,8 @@ export default function Login({ onLoginSuccess, showToast }) {
                                 placeholder="nama@domain.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:bg-yellow-light/40 bg-white"
+                                disabled={isLoading}
+                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:bg-yellow-light/40 bg-white disabled:opacity-50"
                             />
                         </div>
                     </div>
@@ -72,7 +73,8 @@ export default function Login({ onLoginSuccess, showToast }) {
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-10 text-sm outline-none focus:bg-yellow-light/40 bg-white"
+                                disabled={isLoading}
+                                className="w-full font-body border-2 border-text rounded-xl py-2.5 pl-10 pr-10 text-sm outline-none focus:bg-yellow-light/40 bg-white disabled:opacity-50"
                             />
                             <button
                                 type="button"
@@ -84,15 +86,21 @@ export default function Login({ onLoginSuccess, showToast }) {
                         </div>
                     </div>
 
-                    {/* Submit Button */}
                     <button 
-                        type="submit"
-                        disabled={loading}
-                        className={`btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] py-3 mt-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold ${
-                            loading ? 'opacity-60 cursor-not-allowed' : ''
-                        }`}
+                        type="submit" 
+                        disabled={isLoading}
+                        className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] py-3 mt-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-btn disabled:hover:bg-pink"
                     >
-                        <span>{loading ? "Memverifikasi..." : "Masuk ke POS"}</span> <i className={`fa-solid ${loading ? "fa-spinner fa-spin" : "fa-right-to-bracket"} text-xs`}></i>
+                        {isLoading ? (
+                            <>
+                                <i className="fa-solid fa-spinner fa-spin text-xs"></i>
+                                <span>Memverifikasi...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>Masuk ke POS</span> <i className="fa-solid fa-right-to-bracket text-xs"></i>
+                            </>
+                        )}
                     </button>
                 </form>
 
