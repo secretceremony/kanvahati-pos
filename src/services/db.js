@@ -19,6 +19,7 @@ const LOCAL_PRODS_KEY = 'kanvahati_pos_local_products_idr';
 const LOCAL_TXS_KEY = 'kanvahati_pos_local_transactions_idr';
 const LOCAL_CATS_KEY = 'kanvahati_pos_local_categories_idr';
 const LOCAL_CASH_DRAWER_KEY = 'kanvahati_pos_local_cash_drawer_idr';
+const PENDING_TXS_KEY = 'kanvahati_pos_pending_transactions_queue';
 const defaultCategories = [];
 
 // In-Memory Global Caches
@@ -549,7 +550,17 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier, app
         }
         return newTx;
     } catch (e) {
-        console.error("Firestore write transaction failed. Writing to LocalStorage fallback.", e);
+        console.error("Firestore write transaction failed. Queuing for background sync & writing to LocalStorage.", e);
+        // Queue to pending transactions for auto-sync when online
+        try {
+            const rawQueue = localStorage.getItem(PENDING_TXS_KEY);
+            const queue = rawQueue ? JSON.parse(rawQueue) : [];
+            queue.push({ tx: newTx, items: items });
+            localStorage.setItem(PENDING_TXS_KEY, JSON.stringify(queue));
+        } catch (queueErr) {
+            console.warn("Could not save to sync queue:", queueErr);
+        }
+
         const localProds = getLocalProducts();
         items.forEach(item => {
             const prod = localProds.find(p => p.id === item.id);
@@ -572,6 +583,71 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier, app
         localStorage.setItem(LOCAL_TXS_KEY, JSON.stringify(localTxs));
         return newTx;
     }
+};
+
+// Sync queued transactions stored while offline
+export const syncQueuedTransactions = async () => {
+    if (!isUsingFirebase() || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        return { synced: 0, remaining: 0 };
+    }
+
+    const rawQueue = localStorage.getItem(PENDING_TXS_KEY);
+    if (!rawQueue) return { synced: 0, remaining: 0 };
+
+    let queue = [];
+    try {
+        queue = JSON.parse(rawQueue);
+    } catch {
+        return { synced: 0, remaining: 0 };
+    }
+
+    if (!Array.isArray(queue) || queue.length === 0) {
+        return { synced: 0, remaining: 0 };
+    }
+
+    const remainingQueue = [];
+    let syncedCount = 0;
+
+    for (const entry of queue) {
+        const { tx, items } = entry;
+        try {
+            await setDoc(doc(db, "transactions", tx.id), tx);
+            if (Array.isArray(items)) {
+                for (const item of items) {
+                    const docRef = doc(db, "products", item.id);
+                    const prodsList = await getProducts();
+                    const original = prodsList.find(p => p.id === item.id);
+                    if (original) {
+                        if (item.variationName && original.variations && original.variations.length > 0) {
+                            const variations = original.variations.map(v => {
+                                if (v.name === item.variationName) {
+                                    return { ...v, stock: Math.max(0, v.stock - item.qty) };
+                                }
+                                return v;
+                            });
+                            const newStock = variations.reduce((sum, v) => sum + v.stock, 0);
+                            await setDoc(docRef, { ...original, variations, stock: newStock });
+                        } else {
+                            const newStock = Math.max(0, original.stock - item.qty);
+                            await setDoc(docRef, { ...original, stock: newStock });
+                        }
+                    }
+                }
+            }
+            syncedCount++;
+        } catch (err) {
+            console.warn("Failed to sync queued transaction:", tx.id, err);
+            remainingQueue.push(entry);
+        }
+    }
+
+    if (remainingQueue.length > 0) {
+        localStorage.setItem(PENDING_TXS_KEY, JSON.stringify(remainingQueue));
+    } else {
+        localStorage.removeItem(PENDING_TXS_KEY);
+    }
+
+    return { synced: syncedCount, remaining: remainingQueue.length };
 };
 
 // Fetch sales stats
