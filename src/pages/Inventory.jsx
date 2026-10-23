@@ -569,7 +569,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
     return (
         <div className="inventory-layout flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-5 h-auto overflow-visible pb-10">
             {/* Mobile View Tab Selector */}
-            <div className="lg:hidden flex border-2 border-text rounded-xl overflow-hidden mb-1 shrink-0 bg-white font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] w-full">
+            <div className="lg:hidden flex border-2 border-text rounded-xl overflow-hidden mb-1 shrink-0 bg-white font-title text-xs font-bold shadow-[2px_2px_0px_#181818] w-full">
                 <button 
                     type="button"
                     onClick={() => setActiveMobileTab('list')}
@@ -701,7 +701,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                             </div>
                         ) : (
                             /* Variations dynamic lists */
-                            <div className="bg-white border-[3px] border-text rounded-2xl p-4 flex flex-col gap-3.5 shadow-[2px_2px_0px_#32628f] transition-all duration-350 shrink-0">
+                            <div className="bg-white border-[3px] border-text rounded-2xl p-4 flex flex-col gap-3.5 shadow-[2px_2px_0px_#181818] transition-all duration-350 shrink-0">
                                 <h5 className="font-title text-[12px] font-bold text-text flex justify-between items-center border-b border-text/15 pb-1.5">
                                     <span>Daftar Variasi Item</span>
                                     <button 
@@ -792,16 +792,16 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 </div>
 
                 {/* 2. Kelola Kategori Card */}
-                <div className="manage-category-card bg-pink-light border-[3px] border-text rounded-2xl shadow-card p-5 relative shrink-0">
-                    <div className="washi-tape tape-pink absolute top-[-10px] left-10 transform rotate-[2deg] h-6 w-24 border-l border-r border-dashed border-text/25 bg-yellow-light"></div>
-                    
-                    <h3 className="pane-title font-title text-xl text-text mb-4 title-stroke">
-                        <i className="fa-solid fa-tags"></i> Kelola Kategori
+                <div className="manage-category-card bg-pink-light/30 border-[2.5px] border-text rounded-2xl shadow-card p-5 relative shrink-0">
+                    <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-2deg] h-5 w-24 bg-pink border-l border-r border-dashed border-text/25"></div>
+                        
+                    <h3 className="pane-title font-title text-base text-text mb-4 title-stroke">
+                        <i className="fa-solid fa-tags text-pink"></i> Kelola Kategori Produk
                     </h3>
 
                     <div className="flex flex-col gap-3.5 text-text font-body">
                         {/* List of current categories */}
-                        <div className="bg-white border-2 border-text rounded-xl p-3 flex flex-col gap-2 shadow-[2px_2px_0px_#32628f]">
+                        <div className="bg-white border-2 border-text rounded-xl p-3 flex flex-col gap-2 shadow-[2px_2px_0px_#181818]">
                             <h5 className="font-title text-[11px] font-bold text-text border-b border-text/10 pb-1.5 flex justify-between items-center">
                                 <span>📋 Daftar Kategori Saat Ini</span>
                             </h5>
@@ -853,12 +853,22 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 </div>
             </div>
 
-            {/* Right Column: Inventory List Card */}
-            <div className={`inventory-card bg-white border-[3px] border-text rounded-2xl shadow-card p-5 flex flex-col h-auto overflow-visible relative ${activeMobileTab === 'list' ? 'block' : 'hidden lg:flex'}`}>
-                <div className="washi-tape tape-history absolute top-[-12px] right-10 transform rotate-[3deg] h-6 w-24 z-5 border-l border-r border-dashed border-text/25 bg-blue-light"></div>
+            {/* Right Column: Inventory List Card (Retro OS Window) */}
+            <div className={`inventory-card bg-white border-[3px] border-text rounded-2xl shadow-pop overflow-hidden flex flex-col h-auto relative ${activeMobileTab === 'list' ? 'block' : 'hidden lg:flex'}`}>
+                <div className="retro-window-header bg-blue border-b-[2.5px] border-text px-3.5 py-2 flex items-center justify-between">
+                    <div className="retro-dots flex items-center gap-1.5">
+                        <span className="retro-dot retro-dot-red"></span>
+                        <span className="retro-dot retro-dot-yellow"></span>
+                        <span className="retro-dot retro-dot-blue"></span>
+                        <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Katalog & Stok</span>
+                    </div>
+                    <span className="text-[10px] font-tag font-black uppercase bg-yellow px-2 py-0.5 rounded border border-text shadow-[1px_1px_0px_#171717]">{products.length} SKU</span>
+                </div>
                 
-                <h3 className="pane-title font-title text-xl text-text mb-4 title-stroke">
-                    <i className="fa-solid fa-boxes-stacked"></i> {t.inventory || "Stok Barang"}
+                <div className="p-4 sm:p-5 flex flex-col flex-grow bg-[#FFFDF9]">
+                <h3 className="pane-title font-title text-xl text-text mb-4 title-stroke flex items-center gap-2">
+                    <span className="bg-yellow text-text text-sm p-1.5 rounded-lg border border-text shadow-[1.5px_1.5px_0px_#171717]">📦</span>
+                    <span>{t.inventory || "Stok Barang"}</span>
                 </h3>
 
                 {/* Bulk Delete Bar */}
@@ -895,7 +905,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                     const isExpanded = expandedProductId === prod.id;
 
                                     return (
-                                        <div key={prod.id} className={`border-2 border-text rounded-xl p-3.5 shadow-[2px_2px_0px_#32628f] flex flex-col gap-2 ${
+                                        <div key={prod.id} className={`border-2 border-text rounded-xl p-3.5 shadow-[2px_2px_0px_#181818] flex flex-col gap-2 ${
                                             isLowStock ? 'bg-pink-light/30' : 'bg-yellow-light/20'
                                         }`}>
                                             <div className="flex justify-between items-start gap-2 border-b border-dashed border-text/20 pb-2">
@@ -959,7 +969,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                                         <span className="bg-yellow-light border border-text rounded px-2 py-0.5 font-mono text-[10px] font-bold">{v.stock} pcs</span>
                                                                         <button 
                                                                             onClick={() => handleRestockClick(prod, v.name)}
-                                                                            className="btn bg-blue-light text-text border border-text rounded px-2 py-0.5 text-[10px] font-bold shadow-[1px_1px_0px_#32628f] active:translate-y-[1px]"
+                                                                            className="btn bg-blue-light text-text border border-text rounded px-2 py-0.5 text-[10px] font-bold shadow-[1px_1px_0px_#181818] active:translate-y-[1px]"
                                                                             title="Tambah stok"
                                                                         >
                                                                             +Stok
@@ -976,20 +986,20 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                 {!hasVars && (
                                                     <button 
                                                         onClick={() => handleRestockClick(prod)}
-                                                        className="btn flex-1 bg-blue-light text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                        className="btn flex-1 bg-blue-light text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
                                                     >
                                                         <i className="fa-solid fa-box-open"></i> +Stok
                                                     </button>
                                                 )}
                                                 <button 
                                                     onClick={() => handleOpenEditModal(prod)}
-                                                    className="btn flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                    className="btn flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
                                                 >
                                                     <i className="fa-solid fa-pen"></i> Edit
                                                 </button>
                                                 <button 
                                                     onClick={() => handleDelete(prod.id)}
-                                                    className="btn bg-white text-rose-700 border-2 border-text rounded-full px-3 py-1 font-title text-[11px] shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1"
+                                                    className="btn bg-white text-rose-700 border-2 border-text rounded-full px-3 py-1 font-title text-[11px] shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1"
                                                 >
                                                     <i className="fa-solid fa-trash"></i>
                                                 </button>
@@ -1095,14 +1105,14 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                             <button 
                                                                 onClick={() => handleRestockClick(prod)}
                                                                 title="Isi stok barang"
-                                                                className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#32628f] transition-all flex items-center gap-1"
+                                                                className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                             >
                                                                 <i className="fa-solid fa-box-open"></i> {t.restock || "Isi Stok"}
                                                             </button>
                                                         ) : (
                                                             <button 
                                                                 onClick={() => setExpandedProductId(isExpanded ? null : prod.id)}
-                                                                className="btn bg-yellow-light text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#32628f] transition-all flex items-center gap-1"
+                                                                className="btn bg-yellow-light text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                             >
                                                                 <i className="fa-solid fa-layer-group"></i> Variasi
                                                             </button>
@@ -1112,7 +1122,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         <button 
                                                             onClick={() => handleOpenEditModal(prod)}
                                                             title="Edit produk"
-                                                            className="btn bg-blue-light text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#32628f] transition-all flex items-center gap-1"
+                                                            className="btn bg-blue-light text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                         >
                                                             <i className="fa-solid fa-pen-to-square"></i> Edit
                                                         </button>
@@ -1121,7 +1131,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         <button 
                                                             onClick={() => handleDelete(prod.id)}
                                                             title="Hapus produk"
-                                                            className="btn bg-white text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-pink-light cursor-pointer shadow-[1px_1px_0px_#32628f] transition-all flex items-center gap-1 text-pink"
+                                                            className="btn bg-white text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-pink-light cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1 text-pink"
                                                         >
                                                             <i className="fa-solid fa-trash-can"></i>
                                                         </button>
@@ -1133,7 +1143,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                             {hasVars && isExpanded && (
                                                 <tr className="bg-yellow-light/10 border-b border-text/15">
                                                     <td colSpan="6" className="p-3">
-                                                        <div className="bg-white border-2 border-text rounded-xl p-3 shadow-[3px_3px_0px_#32628f] ml-8 my-2 max-w-[500px]">
+                                                        <div className="bg-white border-2 border-text rounded-xl p-3 shadow-[3px_3px_0px_#181818] ml-8 my-2 max-w-[500px]">
                                                             <h5 className="font-title text-[11px] font-bold mb-2.5 text-text border-b border-text/10 pb-1 flex items-center gap-1.5">
                                                                 <i className="fa-solid fa-layer-group text-blue"></i>
                                                                 <span>Daftar Stok Variasi • {prod.name}</span>
@@ -1161,7 +1171,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                                             <span className="font-bold opacity-80">Stok: {v.stock}</span>
                                                                             <button
                                                                                 onClick={() => handleRestockClick(prod, v.name)}
-                                                                                className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-[9px] px-2.5 py-0.5 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#32628f] transition-all flex items-center gap-1"
+                                                                                className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-[9px] px-2.5 py-0.5 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                                             >
                                                                                 <i className="fa-solid fa-box-open text-[8px]"></i> Isi Stok
                                                                             </button>
@@ -1183,11 +1193,12 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                         </>
                     )}
                 </div>
+                </div>
             </div>
 
             {/* Custom Restock Modal overlay */}
             {restockTarget && (
-                <div className="fixed inset-0 bg-[#32628F]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4 animate-[fade_0.2s_ease]">
+                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4 animate-[fade_0.2s_ease]">
                     <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[340px] overflow-hidden flex flex-col p-5 text-text relative">
                         <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
                         
@@ -1245,7 +1256,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
 
             {/* Edit Product Modal overlay */}
             {editingProduct && (
-                <div className="fixed inset-0 bg-[#32628F]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4 animate-[fade_0.2s_ease]">
+                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4 animate-[fade_0.2s_ease]">
                     <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[420px] max-h-[90vh] overflow-hidden flex flex-col p-5 text-text relative">
                         <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
                         
@@ -1389,7 +1400,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                 </>
                             ) : (
                                 /* Variations dynamic lists */
-                                <div className="bg-blue-light/10 border-2 border-text rounded-xl p-3 flex flex-col gap-2 shadow-[2px_2px_0px_#32628f] shrink-0">
+                                <div className="bg-blue-light/10 border-2 border-text rounded-xl p-3 flex flex-col gap-2 shadow-[2px_2px_0px_#181818] shrink-0">
                                     <h5 className="font-title text-[10px] font-bold text-text flex justify-between items-center border-b border-text/15 pb-1">
                                         <span>Daftar Variasi Item</span>
                                         <button 

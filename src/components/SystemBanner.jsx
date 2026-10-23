@@ -146,7 +146,7 @@ export default function SystemBanner() {
                     <button
                         onClick={handleManualSync}
                         disabled={isSyncing}
-                        className="bg-white border-2 border-text text-xs font-bold px-3 py-1 rounded-full shadow-[2px_2px_0px_#32628f] hover:translate-y-[-1px] transition-all cursor-pointer flex items-center gap-1.5"
+                        className="bg-white border-2 border-text text-xs font-bold px-3 py-1 rounded-full shadow-[2px_2px_0px_#181818] hover:translate-y-[-1px] transition-all cursor-pointer flex items-center gap-1.5"
                     >
                         {isSyncing ? (
                             <>
@@ -174,7 +174,7 @@ export default function SystemBanner() {
                     </div>
                     <button 
                         onClick={handleReload}
-                        className="bg-white border-2 border-text text-xs font-bold px-3 py-1 rounded-full shadow-[2px_2px_0px_#32628f] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_#32628f] transition-all cursor-pointer"
+                        className="bg-white border-2 border-text text-xs font-bold px-3 py-1 rounded-full shadow-[2px_2px_0px_#181818] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_#181818] transition-all cursor-pointer"
                     >
                         Refresh Halaman
                     </button>
@@ -188,7 +188,7 @@ export default function SystemBanner() {
                     </div>
                     <button 
                         onClick={handleReload}
-                        className="bg-white border-2 border-text text-xs font-bold px-3 py-1 rounded-full shadow-[2px_2px_0px_#32628f] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_#32628f] transition-all cursor-pointer flex items-center gap-1.5"
+                        className="bg-white border-2 border-text text-xs font-bold px-3 py-1 rounded-full shadow-[2px_2px_0px_#181818] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_#181818] transition-all cursor-pointer flex items-center gap-1.5"
                     >
                         <i className="fa-solid fa-cloud-arrow-down"></i> Muat Ulang
                     </button>

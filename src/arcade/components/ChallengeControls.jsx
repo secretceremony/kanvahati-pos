@@ -155,7 +155,7 @@ export default function ChallengeControls({
         const currentCount = session?.currentProgress || enteredItems.length;
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <div className="flex justify-between items-center mb-2">
                         <span className="font-title text-sm font-bold text-text">Progres Judul Anime:</span>
                         <span className="font-title text-2xl font-extrabold text-pink">
@@ -187,7 +187,7 @@ export default function ChallengeControls({
                             <button
                                 type="submit"
                                 disabled={!isPlaying || disabled || !inputValue.trim()}
-                                className="btn bg-pink text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] hover:bg-white active:translate-y-[1px] disabled:opacity-50 cursor-pointer"
+                                className="btn bg-pink text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#181818] hover:bg-white active:translate-y-[1px] disabled:opacity-50 cursor-pointer"
                             >
                                 <i className="fa-solid fa-plus mr-1"></i> Tambah
                             </button>
@@ -210,7 +210,7 @@ export default function ChallengeControls({
                                 {enteredItems.map((item, idx) => (
                                     <span 
                                         key={idx}
-                                        className="bg-yellow-light border border-text/40 rounded-lg px-2.5 py-1 text-xs font-bold text-text inline-flex items-center gap-1.5 shadow-[1px_1px_0px_#32628f]"
+                                        className="bg-yellow-light border border-text/40 rounded-lg px-2.5 py-1 text-xs font-bold text-text inline-flex items-center gap-1.5 shadow-[1px_1px_0px_#181818]"
                                     >
                                         <span>#{idx + 1} {item}</span>
                                         {isPlaying && (
@@ -267,7 +267,7 @@ export default function ChallengeControls({
         const currentCount = session?.currentProgress || enteredItems.length;
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <div className="flex justify-between items-center mb-2">
                         <span className="font-title text-sm font-bold text-text">
                             Ciri Target: <span className="text-pink font-extrabold">{question.trait || "Sesuai Soal"}</span>
@@ -301,7 +301,7 @@ export default function ChallengeControls({
                             <button
                                 type="submit"
                                 disabled={!isPlaying || disabled || !inputValue.trim()}
-                                className="btn bg-pink text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] hover:bg-white active:translate-y-[1px] disabled:opacity-50 cursor-pointer"
+                                className="btn bg-pink text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#181818] hover:bg-white active:translate-y-[1px] disabled:opacity-50 cursor-pointer"
                             >
                                 <i className="fa-solid fa-plus mr-1"></i> Tambah
                             </button>
@@ -323,7 +323,7 @@ export default function ChallengeControls({
                                 {enteredItems.map((item, idx) => (
                                     <span 
                                         key={idx}
-                                        className="bg-green-100 border border-text/40 rounded-lg px-2.5 py-1 text-xs font-bold text-text inline-flex items-center gap-1.5 shadow-[1px_1px_0px_#32628f]"
+                                        className="bg-green-100 border border-text/40 rounded-lg px-2.5 py-1 text-xs font-bold text-text inline-flex items-center gap-1.5 shadow-[1px_1px_0px_#181818]"
                                     >
                                         <span>#{idx + 1} {item}</span>
                                         {isPlaying && (
@@ -388,7 +388,7 @@ export default function ChallengeControls({
         const countChecked = Object.values(genreChecklist).filter(Boolean).length;
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <div className="flex justify-between items-center mb-2">
                         <span className="font-title text-sm font-bold text-text">Validasi 3 Genre Anime & Contohnya:</span>
                         <span className="font-title text-sm font-bold text-pink">{countChecked} / 6 Komponen Valid</span>
@@ -516,9 +516,9 @@ export default function ChallengeControls({
     if (gameId === 'G04') {
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <div className="flex flex-col sm:flex-row gap-4 items-center mb-3">
-                        <div className="w-32 h-32 border-2 border-text rounded-xl overflow-hidden bg-white shrink-0 shadow-[2px_2px_0px_#32628f] p-1 flex items-center justify-center">
+                        <div className="w-32 h-32 border-2 border-text rounded-xl overflow-hidden bg-white shrink-0 shadow-[2px_2px_0px_#181818] p-1 flex items-center justify-center">
                             <img 
                                 src={question.mediaUrl || "/arcade/guesses/attack_on_titan.png"} 
                                 alt="Cropped Preview" 
@@ -575,7 +575,7 @@ export default function ChallengeControls({
         return (
             <div className="flex flex-col gap-4">
                 {/* Audio Cassette Player Card */}
-                <div className="bg-[#fffdfa] border-[3px] border-text rounded-3xl p-5 shadow-[4px_4px_0px_#32628f]">
+                <div className="bg-[#fffdfa] border-[3px] border-text rounded-3xl p-5 shadow-[4px_4px_0px_#181818]">
                     {/* Header & Answer Key */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-dashed border-text/20">
                         <div>
@@ -612,7 +612,7 @@ export default function ChallengeControls({
                         </div>
 
                         {/* Cassette Graphic & Animated Equalizer */}
-                        <div className="w-full max-w-sm bg-white border-2 border-text rounded-xl p-3 shadow-[2px_2px_0px_#32628f] flex items-center justify-between gap-3 mb-3">
+                        <div className="w-full max-w-sm bg-white border-2 border-text rounded-xl p-3 shadow-[2px_2px_0px_#181818] flex items-center justify-between gap-3 mb-3">
                             {/* Reel 1 */}
                             <div className={`w-10 h-10 rounded-full border-2 border-text bg-yellow flex items-center justify-center shrink-0 ${ytPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '2s' }}>
                                 <div className="w-3 h-3 rounded-full bg-white border border-text"></div>
@@ -748,11 +748,11 @@ export default function ChallengeControls({
 
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2">
                             <span className="font-title text-sm font-bold text-text">Huruf Target:</span>
-                            <span className="bg-yellow border-2 border-text px-3 py-1 rounded-xl font-title text-2xl font-extrabold text-text shadow-[2px_2px_0px_#32628f]">
+                            <span className="bg-yellow border-2 border-text px-3 py-1 rounded-xl font-title text-2xl font-extrabold text-text shadow-[2px_2px_0px_#181818]">
                                 {letter}
                             </span>
                         </div>
@@ -785,7 +785,7 @@ export default function ChallengeControls({
                             <button
                                 type="submit"
                                 disabled={!isPlaying || disabled || !inputValue.trim()}
-                                className="btn bg-pink text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] hover:bg-white active:translate-y-[1px] disabled:opacity-50 cursor-pointer"
+                                className="btn bg-pink text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#181818] hover:bg-white active:translate-y-[1px] disabled:opacity-50 cursor-pointer"
                             >
                                 <i className="fa-solid fa-plus mr-1"></i> Tambah
                             </button>
@@ -807,7 +807,7 @@ export default function ChallengeControls({
                                 {enteredItems.map((item, idx) => (
                                     <span 
                                         key={idx}
-                                        className="bg-yellow-light border border-text/40 rounded-lg px-2.5 py-1 text-xs font-bold text-text inline-flex items-center gap-1.5 shadow-[1px_1px_0px_#32628f]"
+                                        className="bg-yellow-light border border-text/40 rounded-lg px-2.5 py-1 text-xs font-bold text-text inline-flex items-center gap-1.5 shadow-[1px_1px_0px_#181818]"
                                     >
                                         <span>#{idx + 1} {item}</span>
                                         {isPlaying && (
@@ -879,7 +879,7 @@ export default function ChallengeControls({
 
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <div className="bg-pink-light border-2 border-text rounded-xl p-3 mb-3 text-text">
                         <div className="flex items-center justify-between mb-1">
                             <span className="font-title text-xs font-bold uppercase tracking-wider">
@@ -903,7 +903,7 @@ export default function ChallengeControls({
                                 <div 
                                     key={idx}
                                     className={`border-2 border-text rounded-xl p-3 transition-all ${
-                                        isRevealed ? 'bg-yellow-light/60 shadow-[2px_2px_0px_#32628f]' : 'bg-slate-50 opacity-50'
+                                        isRevealed ? 'bg-yellow-light/60 shadow-[2px_2px_0px_#181818]' : 'bg-slate-50 opacity-50'
                                     }`}
                                 >
                                     <div className="flex justify-between items-center mb-1">
@@ -969,10 +969,10 @@ export default function ChallengeControls({
     if (gameId === 'G08') {
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <div className="flex flex-col sm:flex-row gap-4 items-center mb-3">
                         {question.mediaUrl && (
-                            <div className="w-28 h-28 border-2 border-text rounded-xl overflow-hidden bg-white shrink-0 shadow-[2px_2px_0px_#32628f] p-1 flex items-center justify-center">
+                            <div className="w-28 h-28 border-2 border-text rounded-xl overflow-hidden bg-white shrink-0 shadow-[2px_2px_0px_#181818] p-1 flex items-center justify-center">
                                 <img 
                                     src={question.mediaUrl} 
                                     alt="Pose Reference" 
@@ -1029,7 +1029,7 @@ export default function ChallengeControls({
 
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <span className="font-title text-xs font-bold uppercase tracking-wider block text-text/70 mb-2">5 Opsi Karakter (Impostor Berlatar Hijau Host):</span>
                     <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-3">
                         {options.map((opt, idx) => {
@@ -1037,7 +1037,7 @@ export default function ChallengeControls({
                             return (
                                 <div 
                                     key={idx}
-                                    className={`border-2 border-text rounded-xl p-2.5 text-center font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] ${
+                                    className={`border-2 border-text rounded-xl p-2.5 text-center font-title text-xs font-bold shadow-[2px_2px_0px_#181818] ${
                                         isImpostor ? 'bg-green-300 text-text ring-2 ring-green-600' : 'bg-white text-text'
                                     }`}
                                 >
@@ -1088,7 +1088,7 @@ export default function ChallengeControls({
 
         return (
             <div className="flex flex-col gap-4">
-                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f]">
+                <div className="bg-white border-2 border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818]">
                     <span className="font-title text-xs font-bold uppercase tracking-wider block text-text/70 mb-2">5 Judul Anime (Judul Fiktif Berlatar Hijau Host):</span>
                     <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-3">
                         {options.map((opt, idx) => {
@@ -1096,7 +1096,7 @@ export default function ChallengeControls({
                             return (
                                 <div 
                                     key={idx}
-                                    className={`border-2 border-text rounded-xl p-2.5 text-center font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] ${
+                                    className={`border-2 border-text rounded-xl p-2.5 text-center font-title text-xs font-bold shadow-[2px_2px_0px_#181818] ${
                                         isImpostor ? 'bg-green-300 text-text ring-2 ring-green-600' : 'bg-white text-text'
                                     }`}
                                 >

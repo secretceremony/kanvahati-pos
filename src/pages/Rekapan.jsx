@@ -319,15 +319,24 @@ export default function Rekapan({ showToast }) {
     ];
 
     return (
-        <div className="rekapan-layout lg:h-full h-auto flex flex-col gap-5">
-            {/* Header Card */}
-            <div className="bg-white border-[3px] border-text rounded-2xl shadow-card p-6 relative">
-                <div className="washi-tape tape-rekapan absolute top-[-12px] left-10 transform rotate-[-2deg] h-6 w-28 z-5 border-l border-r border-dashed border-text/25 bg-yellow"></div>
+        <div className="rekapan-layout lg:h-full h-auto flex flex-col gap-5 font-body">
+            {/* Header Card (Retro Window) */}
+            <div className="bg-white border-[3px] border-text rounded-2xl shadow-pop overflow-hidden relative">
+                <div className="retro-window-header bg-yellow border-b-[2.5px] border-text px-4 py-2 flex items-center justify-between">
+                    <div className="retro-dots flex items-center gap-1.5">
+                        <span className="retro-dot retro-dot-red"></span>
+                        <span className="retro-dot retro-dot-yellow"></span>
+                        <span className="retro-dot retro-dot-blue"></span>
+                        <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Laporan Omset</span>
+                    </div>
+                    <span className="text-[10px] font-tag font-black uppercase bg-white border border-text px-2 py-0.5 rounded shadow-[1px_1px_0px_#171717]">Laporan Penjualan</span>
+                </div>
 
+                <div className="p-4 sm:p-6 flex flex-col">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
                         <h3 className="pane-title font-title text-2xl text-text mb-1 title-stroke">
-                            <i className="fa-solid fa-file-invoice-dollar"></i> Rekapan Riwayat
+                            <i className="fa-solid fa-file-invoice-dollar text-pink"></i> Rekapan Riwayat
                         </h3>
                         <p className="pane-subtitle text-[13px] opacity-80 text-text">
                             Rangkuman transaksi per hari, minggu, atau bulan. Export ke Excel (.xlsx) kapan saja.
@@ -340,16 +349,17 @@ export default function Rekapan({ showToast }) {
                             <button
                                 key={m.key}
                                 onClick={() => { setMode(m.key); setExpandedPeriod(null); }}
-                                className={`font-title text-[12.5px] font-bold border-2 rounded-full px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
+                                className={`font-tag text-[12px] font-extrabold uppercase border-2 rounded-full px-4 py-1.5 flex items-center gap-1.5 transition-all cursor-pointer ${
                                     mode === m.key
-                                        ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] text-text'
-                                        : 'bg-white border-text/30 text-text/60 hover:bg-blue-light hover:border-text hover:text-text'
+                                        ? 'bg-yellow border-text shadow-[2px_2px_0px_#181818] text-text'
+                                        : 'bg-white border-text/40 text-text/70 hover:bg-yellow-light hover:border-text'
                                 }`}
                             >
                                 <i className={`fa-solid ${m.icon}`}></i> {m.label}
                             </button>
                         ))}
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -575,7 +585,7 @@ export default function Rekapan({ showToast }) {
                                             <div className="flex justify-end">
                                                 <button
                                                     onClick={() => exportPeriodToXLSX(group)}
-                                                    className="font-title text-[12px] font-bold bg-white text-text border-2 border-text rounded-full px-4 py-2 flex items-center gap-2 transition-all cursor-pointer hover:bg-yellow-light shadow-[2px_2px_0px_#32628f]"
+                                                    className="font-title text-[12px] font-bold bg-white text-text border-2 border-text rounded-full px-4 py-2 flex items-center gap-2 transition-all cursor-pointer hover:bg-yellow-light shadow-[2px_2px_0px_#181818]"
                                                 >
                                                     <i className="fa-solid fa-download"></i> Export Periode Ini (.xlsx)
                                                 </button>

@@ -134,79 +134,82 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
     };
 
     return (
-        <div className="receipt-modal-overlay fixed inset-0 bg-[#32628F]/45 backdrop-blur-sm z-[10000] flex justify-center items-center opacity-100 pointer-events-auto transition-opacity duration-300">
-            <div id="receipt-print-area" className="receipt-paper w-[320px] bg-white border-[3px] border-text shadow-[10px_10px_0px_#32628f] relative flex flex-col animate-[ticketSlide_0.4s_cubic-bezier(0.175,0.885,0.32,1.15)_forwards]">
+        <div className="receipt-modal-overlay fixed inset-0 bg-[#171717]/60 backdrop-blur-sm z-[10000] flex justify-center items-center opacity-100 pointer-events-auto transition-opacity duration-300 p-4">
+            <div id="receipt-print-area" className="receipt-paper w-[330px] bg-white border-[3px] border-text shadow-[10px_10px_0px_#171717] relative flex flex-col animate-[ticketSlide_0.4s_cubic-bezier(0.175,0.885,0.32,1.15)_forwards]">
+                {/* Washi Tape Strip at top of receipt */}
+                <div className="tape-strip"></div>
+
                 {/* Scallop Top */}
                 <div className="receipt-scallop-top absolute top-[-12px] left-[-3px] right-[-3px]"></div>
                 
-                <div className="receipt-body p-5 text-text">
+                <div className="receipt-body p-6 text-text">
                     <div className="receipt-logo text-center mb-3">
-                        <span className="receipt-logo-text font-title text-[18px] block">Kanvahati POS</span>
-                        <p className="text-[11px] opacity-80">{t.printedFrom}</p>
+                        <span className="receipt-logo-text font-title text-[20px] font-bold block text-text tracking-wide">Kanvahati POS</span>
+                        <p className="text-[11px] font-tag font-bold opacity-75">{t.printedFrom}</p>
                     </div>
                     
-                    <div className="receipt-divider border-t-2 border-dashed border-text my-2.5"></div>
+                    <div className="receipt-divider border-t-2 border-dashed border-text/40 my-3"></div>
                     
-                    <div className="receipt-meta text-[11px] flex flex-col gap-1">
-                        <div><strong>{t.orderId}:</strong> {transaction.id}</div>
-                        <div><strong>{t.date}:</strong> {formattedDate}</div>
-                        <div><strong>{t.cashier || "User"}:</strong> {(transaction.cashier || "Staf").replace(/^Kasir\s+/i, '')}</div>
+                    <div className="receipt-meta text-[11.5px] font-body flex flex-col gap-1">
+                        <div><strong className="font-tag uppercase tracking-wider text-[10px] text-text/70">{t.orderId}:</strong> {transaction.id}</div>
+                        <div><strong className="font-tag uppercase tracking-wider text-[10px] text-text/70">{t.date}:</strong> {formattedDate}</div>
+                        <div><strong className="font-tag uppercase tracking-wider text-[10px] text-text/70">{t.cashier || "User"}:</strong> {(transaction.cashier || "Staf").replace(/^Kasir\s+/i, '')}</div>
                     </div>
 
-                    <div className="receipt-divider border-t-2 border-dashed border-text my-2.5"></div>
+                    <div className="receipt-divider border-t-2 border-dashed border-text/40 my-3"></div>
 
                     {/* Items Purchased */}
-                    <div className="receipt-items flex flex-col gap-2 text-[12px]">
+                    <div className="receipt-items flex flex-col gap-2.5 text-[12px]">
                         {transaction.items && transaction.items.map((item, idx) => {
                             const hasDiscount = (item.discount || 0) > 0;
                             return (
-                                <div key={idx} className="r-item-line flex justify-between">
-                                    <span className="r-item-title flex flex-col">
-                                        <span>{item.qty}x {item.name}</span>
+                                <div key={idx} className="r-item-line flex justify-between items-start">
+                                    <span className="r-item-title flex flex-col pr-2">
+                                        <span className="font-bold">{item.qty}x {item.name}</span>
                                         {hasDiscount && (
-                                            <span className="text-[9px] text-pink font-bold">disc -{formatReceiptMoney(item.discount)}/pcs</span>
+                                            <span className="text-[9.5px] text-pink font-tag font-black">disc -{formatReceiptMoney(item.discount)}/pcs</span>
                                         )}
                                     </span>
-                                    <span className="r-item-total font-bold">{formatReceiptMoney(item.price * item.qty)}</span>
+                                    <span className="r-item-total font-title font-bold shrink-0">{formatReceiptMoney(item.price * item.qty)}</span>
                                 </div>
                             );
                         })}
                     </div>
 
-                    <div className="receipt-divider border-t-2 border-dashed border-text my-2.5"></div>
+                    <div className="receipt-divider border-t-2 border-dashed border-text/40 my-3"></div>
 
                     {/* Totals Summary */}
                     <div className="receipt-summary flex flex-col gap-1 text-[12px]">
-                        <div className="r-summary-row flex justify-between">
+                        <div className="r-summary-row flex justify-between font-body">
                             <span>{t.subtotal}:</span>
-                            <span>{formatReceiptMoney(transaction.subtotal || 0)}</span>
+                            <span className="font-bold">{formatReceiptMoney(transaction.subtotal || 0)}</span>
                         </div>
                         {transaction.appliedBundles && transaction.appliedBundles.length > 0 && transaction.appliedBundles.map((b, idx) => (
-                            <div key={idx} className="r-summary-row flex justify-between text-pink font-bold">
+                            <div key={idx} className="r-summary-row flex justify-between text-pink font-tag font-bold text-[11px]">
                                 <span>Promo: {b.bundleName}</span>
                                 <span>-{formatReceiptMoney(b.discount)}</span>
                             </div>
                         ))}
-                        <div className="r-summary-row font-bold flex justify-between text-[15px] border-t border-text/20 pt-1.5 mt-1">
+                        <div className="r-summary-row font-title font-bold flex justify-between text-[16px] border-t-2 border-dashed border-text/40 pt-2 mt-1">
                             <span>{t.grandTotal}:</span>
-                            <span>{formatReceiptMoney(transaction.total || 0)}</span>
+                            <span className="text-text">{formatReceiptMoney(transaction.total || 0)}</span>
                         </div>
-                        <div className="r-summary-row flex justify-between">
-                            <span>{t.method}:</span>
-                            <span className="uppercase font-bold">
+                        <div className="r-summary-row flex justify-between font-tag text-[11px] uppercase pt-1">
+                            <span className="font-bold opacity-75">{t.method}:</span>
+                            <span className="font-black bg-yellow px-2 py-0.2 rounded border border-text shadow-[1px_1px_0px_#171717]">
                                 {transaction.paymentMethod === 'cash' ? t.cash : t.qris}
                             </span>
                         </div>
                     </div>
 
-                    <div className="receipt-divider border-t-2 border-dashed border-text my-2.5"></div>
+                    <div className="receipt-divider border-t-2 border-dashed border-text/40 my-3"></div>
                     
                     <div className="receipt-thankyou text-center mt-3.5 relative">
-                        <div className="stamp-approved border-3 border-pink text-pink font-title text-[14px] font-bold px-2 py-1 rounded inline-block rotate-[-10deg] opacity-85 mb-2">
-                            {t.approved}
+                        <div className="stamp-approved border-[2.5px] border-pink text-pink font-tag text-[12px] font-black uppercase px-2.5 py-1 rounded-md inline-block rotate-[-8deg] shadow-[2px_2px_0px_#171717] mb-2 bg-pink-light/30">
+                            ★ {t.approved} ★
                         </div>
-                        <p className="text-[11px] font-bold">{t.thankYou}</p>
-                        <p className="text-[10px] opacity-75 mt-1.5 font-bold tracking-wider text-text/80"><i className="fa-brands fa-instagram"></i> @kanvahati</p>
+                        <p className="text-[12px] font-title font-bold">{t.thankYou}</p>
+                        <p className="text-[10.5px] font-tag font-bold tracking-wider text-text/80 mt-1"><i className="fa-brands fa-instagram"></i> @kanvahati</p>
                     </div>
                 </div>
 
@@ -214,17 +217,17 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                 <div className="receipt-scallop-bottom absolute bottom-[-12px] left-[-3px] right-[-3px]"></div>
                 
                 {/* Modal Buttons */}
-                <div className="receipt-actions absolute bottom-[-80px] left-0 right-0 flex justify-center gap-4">
+                <div className="receipt-actions absolute bottom-[-75px] left-0 right-0 flex justify-center gap-3">
                     <button 
                         onClick={onClose} 
-                        className="btn bg-white text-text border-[3px] border-text rounded-full font-title text-[14px] px-6 py-2 shadow-btn hover:bg-blue-light hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer"
+                        className="btn bg-white text-text border-[2.5px] border-text rounded-xl font-tag text-[12px] font-black uppercase tracking-wider px-5 py-2.5 shadow-[3px_3px_0px_#171717] hover:bg-yellow-light hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#171717] active:translate-y-[1px] active:shadow-[1px_1px_0px_#171717] transition-all cursor-pointer"
                     >
                         {t.close}
                     </button>
                     <button 
                         onClick={handleDownloadPDF} 
                         disabled={isGeneratingPdf}
-                        className={`btn ${isGeneratingPdf ? 'bg-gray-300' : 'bg-yellow hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f]'} text-text border-[3px] border-text rounded-full font-title text-[14px] px-6 py-2 shadow-btn active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center gap-2`}
+                        className={`btn ${isGeneratingPdf ? 'bg-gray-300' : 'bg-yellow hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#171717]'} text-text border-[2.5px] border-text rounded-xl font-tag text-[12px] font-black uppercase tracking-wider px-5 py-2.5 shadow-[3px_3px_0px_#171717] active:translate-y-[1px] active:shadow-[1px_1px_0px_#171717] transition-all cursor-pointer flex items-center gap-1.5`}
                     >
                         {isGeneratingPdf ? (
                             <><i className="fa-solid fa-spinner fa-spin text-xs"></i> Tunggu...</>
@@ -234,7 +237,7 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                     </button>
                     <button 
                         onClick={handlePrint} 
-                        className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] px-6 py-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center gap-2"
+                        className="btn bg-pink text-text border-[2.5px] border-text rounded-xl font-tag text-[12px] font-black uppercase tracking-wider px-5 py-2.5 shadow-[3px_3px_0px_#171717] hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#171717] active:translate-y-[1px] active:shadow-[1px_1px_0px_#171717] transition-all cursor-pointer flex items-center gap-1.5"
                     >
                         <i className="fa-solid fa-print text-xs"></i> {t.print}
                     </button>

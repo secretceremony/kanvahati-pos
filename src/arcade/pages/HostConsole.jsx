@@ -615,7 +615,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                 <div className="washi-tape tape-history absolute top-[-10px] left-8 transform rotate-[-2deg] h-5 w-20 bg-pink-light"></div>
                 
                 <div className="flex items-center gap-3">
-                    <div className="bg-pink text-text border-2 border-text rounded-xl p-2.5 flex items-center justify-center shadow-[2px_2px_0px_#32628f]">
+                    <div className="bg-pink text-text border-2 border-text rounded-xl p-2.5 flex items-center justify-center shadow-[2px_2px_0px_#181818]">
                         <i className="fa-solid fa-gamepad text-xl"></i>
                     </div>
                     <div>
@@ -661,7 +661,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                             }
                             handleResetSession();
                         }}
-                        className="btn bg-rose-200 hover:bg-rose-300 text-rose-900 border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#32628f] cursor-pointer transition-transform hover:scale-105"
+                        className="btn bg-rose-200 hover:bg-rose-300 text-rose-900 border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818] cursor-pointer transition-transform hover:scale-105"
                         title="Reset sesi stasiun ke IDLE kapan saja"
                     >
                         <i className="fa-solid fa-rotate-left text-rose-700"></i>
@@ -671,7 +671,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                         to={`/arcade/display?event=${eventId}&station=${stationId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn bg-white hover:bg-yellow-light border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#32628f] cursor-pointer transition-transform hover:scale-105"
+                        className="btn bg-white hover:bg-yellow-light border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818] cursor-pointer transition-transform hover:scale-105"
                         title="Buka tampilan layar pengunjung di tab/jendela baru"
                     >
                         <i className="fa-solid fa-display text-pink"></i>
@@ -679,7 +679,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                     </Link>
                     <Link
                         to="/arcade/questions"
-                        className="btn bg-white hover:bg-pink-light border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#32628f] cursor-pointer transition-transform hover:scale-105"
+                        className="btn bg-white hover:bg-pink-light border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818] cursor-pointer transition-transform hover:scale-105"
                         title="Kelola Bank Soal & Aset Media"
                     >
                         <i className="fa-solid fa-database text-yellow-600"></i>
@@ -721,7 +721,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                         type="button"
                                         disabled={isSessionActive || checkingParticipant}
                                         onClick={handleCheckParticipant}
-                                        className="btn bg-blue-light text-text border-2 border-text rounded-xl px-3 py-2 font-title font-bold shadow-[2px_2px_0px_#32628f] hover:bg-yellow cursor-pointer disabled:opacity-50"
+                                        className="btn bg-blue-light text-text border-2 border-text rounded-xl px-3 py-2 font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-yellow cursor-pointer disabled:opacity-50"
                                     >
                                         {checkingParticipant ? <i className="fa-solid fa-spinner fa-spin"></i> : "Cek"}
                                     </button>
@@ -783,7 +783,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                         onClick={() => setSelectedGameId(game.id)}
                                         className={`border-2 border-text rounded-xl p-2 text-left transition-all cursor-pointer ${
                                             isSelected 
-                                                ? 'bg-pink text-text shadow-[2px_2px_0px_#32628f] font-bold' 
+                                                ? 'bg-pink text-text shadow-[2px_2px_0px_#181818] font-bold' 
                                                 : 'bg-white hover:bg-yellow-light text-text/80'
                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
@@ -850,7 +850,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
 
                             {/* Big 30-Second Timer Display */}
                             <div className="flex items-center gap-3">
-                                <div className={`flex flex-col items-center justify-center w-24 h-24 rounded-2xl border-[3px] border-text shadow-[4px_4px_0px_#32628f] transition-all ${
+                                <div className={`flex flex-col items-center justify-center w-24 h-24 rounded-2xl border-[3px] border-text shadow-[4px_4px_0px_#181818] transition-all ${
                                     remainingSeconds <= 10 && isSessionActive ? 'bg-rose-200 animate-bounce' : 'bg-yellow-light'
                                 }`}>
                                     <span className={`font-title text-4xl font-extrabold ${
@@ -870,7 +870,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                     type="button"
                                     disabled={isSessionActive || loadingQuestions}
                                     onClick={handlePickRandomQuestion}
-                                    className="btn bg-yellow hover:bg-yellow-light text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs md:text-sm font-bold shadow-[2px_2px_0px_#32628f] hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-grow"
+                                    className="btn bg-yellow hover:bg-yellow-light text-text border-2 border-text rounded-xl px-4 py-2 font-title text-xs md:text-sm font-bold shadow-[2px_2px_0px_#181818] hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-grow"
                                     title="Acak soal dalam challenge ini"
                                 >
                                     <i className="fa-solid fa-dice text-lg text-pink"></i>
@@ -884,7 +884,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                     type="button"
                                     disabled={isSessionActive}
                                     onClick={handlePickRandomChallenge}
-                                    className="btn bg-white hover:bg-pink-light text-text border-2 border-text rounded-xl px-3 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] hover:translate-y-[-1px] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                                    className="btn bg-white hover:bg-pink-light text-text border-2 border-text rounded-xl px-3 py-2 font-title text-xs font-bold shadow-[2px_2px_0px_#181818] hover:translate-y-[-1px] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                                     title="Ganti ke tantangan acak lainnya"
                                 >
                                     <i className="fa-solid fa-shuffle text-pink"></i>
@@ -906,7 +906,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                                 onClick={() => handleSelectQuestion(q)}
                                                 className={`px-2.5 py-1 rounded-lg border-2 text-[11px] font-title font-bold transition-all shrink-0 cursor-pointer ${
                                                     isCurrent
-                                                        ? 'bg-pink text-text border-text shadow-[1.5px_1.5px_0px_#32628f]'
+                                                        ? 'bg-pink text-text border-text shadow-[1.5px_1.5px_0px_#181818]'
                                                         : 'bg-white text-text/70 border-text/30 hover:border-text hover:text-text'
                                                 } disabled:opacity-50`}
                                             >
@@ -920,11 +920,11 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
 
                         {/* PREVIEW OF QUESTIONS & ANSWERS (Before Clicking Start / Host Inspection) */}
                         {!isSessionActive && !isSessionFinished && currentQuestion && (
-                            <div className="bg-[#fffdf8] border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#32628f] mb-4">
+                            <div className="bg-[#fffdf8] border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#181818] mb-4">
                                 {/* Header */}
                                 <div className="flex items-center justify-between pb-2.5 mb-3 border-b-2 border-dashed border-text/20">
                                     <div className="flex items-center gap-2">
-                                        <span className="bg-yellow border-2 border-text text-text p-1.5 rounded-lg text-xs font-black shadow-[1.5px_1.5px_0px_#32628f]">
+                                        <span className="bg-yellow border-2 border-text text-text p-1.5 rounded-lg text-xs font-black shadow-[1.5px_1.5px_0px_#181818]">
                                             <i className="fa-solid fa-eye text-navy"></i>
                                         </span>
                                         <div>
@@ -1250,7 +1250,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                                 handleResetSession();
                                             }
                                         }}
-                                        className="btn bg-rose-100 hover:bg-rose-200 text-rose-800 border-2 border-text rounded-xl px-3 py-1.5 font-title text-xs font-bold flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_#32628f] cursor-pointer transition-all"
+                                        className="btn bg-rose-100 hover:bg-rose-200 text-rose-800 border-2 border-text rounded-xl px-3 py-1.5 font-title text-xs font-bold flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_#181818] cursor-pointer transition-all"
                                     >
                                         <i className="fa-solid fa-rotate-left"></i>
                                         <span>Batalkan & Reset Sesi</span>
@@ -1263,7 +1263,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                         {isSessionFinished && (
                             <div className="flex flex-col gap-4 mt-2 animate-[ticketSlide_0.3s_ease-out]">
                                 {/* Banner */}
-                                <div className={`border-[3px] border-text rounded-2xl p-4 text-center shadow-[4px_4px_0px_#32628f] ${
+                                <div className={`border-[3px] border-text rounded-2xl p-4 text-center shadow-[4px_4px_0px_#181818] ${
                                     session.status === SESSION_STATES.WON 
                                         ? 'bg-green-300 text-text' 
                                         : 'bg-rose-200 text-text'
@@ -1278,7 +1278,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                 </div>
 
                                 {/* Prize Claim Section */}
-                                <div className="bg-white border-2 border-text rounded-xl p-4 shadow-[2px_2px_0px_#32628f]">
+                                <div className="bg-white border-2 border-text rounded-xl p-4 shadow-[2px_2px_0px_#181818]">
                                     <span className="font-title text-xs font-bold uppercase tracking-wider block mb-2 text-text">
                                         <i className="fa-solid fa-gift text-pink mr-1"></i> Penyerahan Hadiah Booth:
                                     </span>
@@ -1295,7 +1295,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                                     type="button"
                                                     disabled={sketchClaimed || submittingAction}
                                                     onClick={handleClaimSketch}
-                                                    className={`px-3 py-1.5 rounded-lg border-2 border-text font-title text-xs font-bold shadow-[1.5px_1.5px_0px_#32628f] cursor-pointer transition-all ${
+                                                    className={`px-3 py-1.5 rounded-lg border-2 border-text font-title text-xs font-bold shadow-[1.5px_1.5px_0px_#181818] cursor-pointer transition-all ${
                                                         sketchClaimed ? 'bg-green-400 text-text cursor-default' : 'bg-pink text-text hover:bg-white'
                                                     }`}
                                                 >
@@ -1314,7 +1314,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                                 type="button"
                                                 disabled={stickerClaimed || submittingAction}
                                                 onClick={handleClaimSticker}
-                                                className={`px-3 py-1.5 rounded-lg border-2 border-text font-title text-xs font-bold shadow-[1.5px_1.5px_0px_#32628f] cursor-pointer transition-all ${
+                                                className={`px-3 py-1.5 rounded-lg border-2 border-text font-title text-xs font-bold shadow-[1.5px_1.5px_0px_#181818] cursor-pointer transition-all ${
                                                     stickerClaimed ? 'bg-green-400 text-text cursor-default' : 'bg-yellow text-text hover:bg-white'
                                                 }`}
                                             >
@@ -1351,7 +1351,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b-2 border-text/10">
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="bg-pink text-text border-2 border-text p-1.5 rounded-xl shadow-[2px_2px_0px_#32628f]">
+                            <span className="bg-pink text-text border-2 border-text p-1.5 rounded-xl shadow-[2px_2px_0px_#181818]">
                                 <i className="fa-solid fa-users text-sm"></i>
                             </span>
                             <h2 className="font-title text-base sm:text-lg font-bold text-text">
@@ -1380,23 +1380,23 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
 
                 {/* Summary Stats Badges */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-                    <div className="bg-yellow-light border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#32628f]">
+                    <div className="bg-yellow-light border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#181818]">
                         <span className="text-[10px] font-bold text-text/70 uppercase block">Total Bermain</span>
                         <span className="font-title text-lg font-extrabold text-navy">{playedParticipants.length}</span>
                     </div>
-                    <div className="bg-emerald-100 border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#32628f]">
+                    <div className="bg-emerald-100 border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#181818]">
                         <span className="text-[10px] font-bold text-emerald-800 uppercase block">Menang (Grand Prize)</span>
                         <span className="font-title text-lg font-extrabold text-emerald-700">
                             {playedParticipants.filter(p => p.result === 'win').length}
                         </span>
                     </div>
-                    <div className="bg-rose-100 border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#32628f]">
+                    <div className="bg-rose-100 border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#181818]">
                         <span className="text-[10px] font-bold text-rose-800 uppercase block">Kalah / Belum Berhasil</span>
                         <span className="font-title text-lg font-extrabold text-rose-700">
                             {playedParticipants.filter(p => p.result === 'lose').length}
                         </span>
                     </div>
-                    <div className="bg-pink-light border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#32628f]">
+                    <div className="bg-pink-light border-2 border-text rounded-xl p-2.5 text-center shadow-[2px_2px_0px_#181818]">
                         <span className="text-[10px] font-bold text-text/70 uppercase block">Sketch Terklaim</span>
                         <span className="font-title text-lg font-extrabold text-pink">
                             {playedParticipants.filter(p => p.sketchClaimed).length}
@@ -1500,7 +1500,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleClaimSketchDirect(p.participantKey || p.id)}
-                                                        className="btn bg-yellow hover:bg-yellow-light text-text border-2 border-text rounded-lg px-2.5 py-1 text-[11px] font-title font-bold shadow-[1.5px_1.5px_0px_#32628f] cursor-pointer"
+                                                        className="btn bg-yellow hover:bg-yellow-light text-text border-2 border-text rounded-lg px-2.5 py-1 text-[11px] font-title font-bold shadow-[1.5px_1.5px_0px_#181818] cursor-pointer"
                                                     >
                                                         Klaim Sketch
                                                     </button>

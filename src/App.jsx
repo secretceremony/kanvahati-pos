@@ -37,7 +37,7 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
         const isActive = matchPrefix ? currentPath.startsWith(path) : currentPath === path;
         return `flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
             isActive
-                ? 'bg-yellow text-text border-text shadow-[2px_2px_0px_#32628f] translate-x-1'
+                ? 'bg-yellow text-text border-text shadow-[2px_2px_0px_#181818] translate-x-1'
                 : 'bg-white/80 text-text/80 border-transparent hover:bg-yellow-light/60 hover:border-text hover:text-text'
         }`;
     };
@@ -52,25 +52,21 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                 />
             )}
 
-            <aside className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r-[3px] border-text shadow-[4px_0px_0px_#32628f] flex flex-col justify-between transition-transform duration-300 lg:translate-x-0 ${
+            <aside className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r-[3px] border-text shadow-[4px_0px_0px_#181818] flex flex-col justify-between transition-transform duration-300 lg:translate-x-0 ${
                 isOpen ? 'translate-x-0' : '-translate-x-full'
             }`}>
                 {/* Brand & Canopy Banner */}
                 <div>
-                    <div className={`canopy-stripes h-3 border-b-[3px] border-text ${
-                        isSuperAdmin
-                            ? 'bg-[repeating-linear-gradient(90deg,#9333ea_0px,#9333ea_30px,var(--color-white)_30px,var(--color-white)_60px)]'
-                            : 'bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_30px,var(--color-white)_30px,var(--color-white)_60px)]'
-                    }`}></div>
+                <div className={`canopy-stripes h-3 border-b-[2.5px] border-text bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_20px,var(--color-yellow)_20px,var(--color-yellow)_40px,var(--color-blue)_40px,var(--color-blue)_60px,var(--color-white)_60px,var(--color-white)_80px)]`}></div>
                     
-                    <div className="p-4 border-b-2 border-text/10 flex items-center justify-between">
+                    <div className="p-3.5 border-b-[2.5px] border-text flex items-center justify-between bg-blue">
                         <Link to="/" onClick={onClose} className="flex-grow flex items-center justify-center py-1">
-                            <img src="/kanvahati-logo.png" alt="Kanvahati Logo" className="h-11 object-contain" />
+                            <img src="/kanvahati-logo.png" alt="Kanvahati Logo" className="h-11 object-contain filter drop-shadow-[2.5px_2.5px_0px_#171717]" />
                         </Link>
                         {/* Close button on mobile */}
                         <button 
                             onClick={onClose}
-                            className="lg:hidden p-1.5 text-text hover:text-pink text-sm cursor-pointer ml-2"
+                            className="lg:hidden p-1.5 text-text hover:text-pink text-sm cursor-pointer ml-2 border-2 border-text rounded-full bg-white shadow-[1.5px_1.5px_0px_#171717]"
                         >
                             <i className="fa-solid fa-xmark"></i>
                         </button>
@@ -165,7 +161,7 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                                         onClick={onClose} 
                                         className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
                                             currentPath === '/arcade/host'
-                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#32628f] translate-x-1'
+                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#181818] translate-x-1'
                                                 : 'bg-white/80 text-text/80 border-transparent hover:bg-pink-light hover:border-text hover:text-text'
                                         }`}
                                     >
@@ -177,7 +173,7 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                                         onClick={onClose} 
                                         className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
                                             currentPath === '/arcade/questions'
-                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#32628f] translate-x-1'
+                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#181818] translate-x-1'
                                                 : 'bg-white/80 text-text/80 border-transparent hover:bg-pink-light hover:border-text hover:text-text'
                                         }`}
                                     >
@@ -198,10 +194,10 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                                     <Link 
                                         to="/admin" 
                                         onClick={onClose} 
-                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer shadow-[2px_2px_0px_#32628f] ${
+                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer shadow-[2px_2px_0px_#181818] ${
                                             currentPath === '/admin'
-                                                ? 'bg-purple-700 text-white border-text translate-x-1'
-                                                : 'bg-purple-600 text-white border-text hover:bg-purple-700'
+                                                ? 'bg-pink text-text border-text translate-x-1'
+                                                : 'bg-yellow text-text border-text hover:bg-yellow-light'
                                         }`}
                                     >
                                         <i className="fa-solid fa-shield-halved w-4 text-center"></i>
@@ -214,10 +210,10 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                 </div>
 
                 {/* Profile Footer */}
-                <div className="p-3 pb-6 border-t-2 border-text/10 bg-yellow-light/20 flex items-center justify-between gap-2">
+                <div className="p-3 pb-6 border-t-2 border-text/10 bg-yellow-light/40 flex items-center justify-between gap-2">
                     <div className="flex flex-col min-w-0">
-                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-text self-start leading-none mb-1 ${
-                            isSuperAdmin ? 'bg-purple-200 text-purple-950 font-black' : 'bg-pink-light text-text'
+                        <span className={`text-[9px] font-tag font-extrabold uppercase px-1.5 py-0.5 rounded border border-text self-start leading-none mb-1 ${
+                            isSuperAdmin ? 'bg-pink text-text' : 'bg-yellow text-text'
                         }`}>
                             {isSuperAdmin ? '👑 SUPER ADMIN' : (userRole || 'KASIR')}
                         </span>
@@ -228,7 +224,7 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
 
                     <button
                         onClick={onLogout}
-                        className="text-pink bg-white border-2 border-text rounded-full p-2 hover:bg-pink-light transition-all cursor-pointer text-xs shadow-[1.5px_1.5px_0px_#32628f] shrink-0"
+                        className="text-text bg-white border-2 border-text rounded-full p-2 hover:bg-pink transition-all cursor-pointer text-xs shadow-[1.5px_1.5px_0px_#181818] shrink-0"
                         title="Keluar / Logout"
                     >
                         <i className="fa-solid fa-right-from-bracket"></i>
@@ -314,42 +310,48 @@ function MainRoutes({
                     <SystemBanner />
                     
                     {/* Top Bar on Mobile & Desktop */}
-                    <header className="pos-header bg-white border-[3px] border-text rounded-[20px] shadow-card mb-5 overflow-hidden shrink-0">
-                        <div className={`canopy-stripes h-2.5 border-b-[3px] border-text ${
-                            userRole === 'super_admin'
-                                ? 'bg-[repeating-linear-gradient(90deg,#9333ea_0px,#9333ea_30px,var(--color-white)_30px,var(--color-white)_60px)]'
-                                : 'bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_30px,var(--color-white)_30px,var(--color-white)_60px)]'
-                        }`}></div>
+                    <header className="pos-header bg-white border-[3px] border-text rounded-2xl shadow-pop mb-5 overflow-hidden shrink-0">
+                        {/* Retro OS Style Window Header */}
+                        <div className="retro-window-header bg-blue border-b-[2.5px] border-text px-3 sm:px-4 py-2 flex items-center justify-between">
+                            <div className="retro-dots flex items-center gap-1.5">
+                                <span className="retro-dot retro-dot-red"></span>
+                                <span className="retro-dot retro-dot-yellow"></span>
+                                <span className="retro-dot retro-dot-blue"></span>
+                                <span className="font-tag text-[9.5px] font-black uppercase tracking-wider text-text ml-1.5">Kanvahati Terminal</span>
+                            </div>
+                            <span className="text-[10px] font-tag font-black uppercase bg-yellow px-2 py-0.5 rounded border border-text shadow-[1px_1px_0px_#171717]">v2.0-PRO</span>
+                        </div>
 
-                        <div className="header-content flex justify-between items-center px-3 sm:px-4 py-2 sm:py-2.5 gap-2">
+                        <div className="header-content flex justify-between items-center px-3 sm:px-4 py-2.5 sm:py-3 gap-2 bg-[#FFFDF9]">
                             {/* Left: Mobile hamburger & Dynamic Page Title */}
                             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                                 <button
                                     onClick={() => setSidebarOpen(true)}
-                                    className="lg:hidden p-1.5 sm:p-2 rounded-xl border-2 border-text bg-yellow text-text shadow-[2px_2px_0px_#32628f] hover:bg-yellow-light cursor-pointer text-xs sm:text-sm shrink-0"
+                                    className="lg:hidden p-1.5 sm:p-2 rounded-xl border-2 border-text bg-yellow text-text shadow-[2px_2px_0px_#171717] hover:bg-yellow-light cursor-pointer text-xs sm:text-sm shrink-0"
                                     title="Buka Menu"
                                 >
                                     <i className="fa-solid fa-bars"></i>
                                 </button>
 
                                 {/* Dynamic Page Title in Theme font-title (DynaPuff) */}
-                                <h2 className="font-title text-sm sm:text-lg font-bold text-text tracking-wide title-stroke truncate">
-                                    {pageTitle}
+                                <h2 className="font-title text-base sm:text-xl font-bold text-text tracking-wide title-stroke truncate flex items-center gap-2">
+                                    <span className="text-pink">✦</span>
+                                    <span>{pageTitle}</span>
                                 </h2>
                             </div>
 
                             {/* Right: User Badge & Role (Positioned to the right of Page Title) */}
                             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-                                <span className={`badge-role border-2 border-text rounded-full px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                                    userRole === 'super_admin' ? 'bg-purple-200 text-purple-950 font-black' : 'bg-pink-light text-text'
+                                <span className={`sticker-tag rounded-lg px-2 sm:px-3 py-1 text-[9.5px] sm:text-[10.5px] shrink-0 hidden xs:inline-flex shadow-[1.5px_1.5px_0px_#171717] ${
+                                    userRole === 'super_admin' ? 'bg-pink text-white font-black' : 'bg-yellow text-text font-black'
                                 }`}>
-                                    <span className="inline sm:hidden">{userRole === 'super_admin' ? '👑 ADMIN' : (userRole || 'KASIR')}</span>
-                                    <span className="hidden sm:inline">{userRole === 'super_admin' ? '👑 SUPER ADMIN' : (userRole || 'KASIR')}</span>
+                                    <span className="inline sm:hidden">{userRole === 'super_admin' ? '★ ADMIN' : (userRole || 'KASIR')}</span>
+                                    <span className="hidden sm:inline">{userRole === 'super_admin' ? '★ SUPER ADMIN' : (userRole || 'KASIR')}</span>
                                 </span>
                                 
-                                <div className="flex items-center gap-1 sm:gap-2 border-2 border-text rounded-full px-2 sm:px-3 py-0.5 bg-yellow-light/30 text-text shrink-0">
-                                    <span className="hidden sm:inline font-body text-[10px] font-bold opacity-70 uppercase">User:</span>
-                                    <span className="font-title text-[10.5px] sm:text-[11.5px] font-bold truncate max-w-[90px] sm:max-w-none">{activeCashier}</span>
+                                <div className="flex items-center gap-1.5 sm:gap-2 border-2 border-text rounded-lg px-2 sm:px-3 py-1 bg-yellow-light text-text shrink-0 shadow-[1.5px_1.5px_0px_#171717]">
+                                    <span className="hidden sm:inline font-tag text-[9.5px] font-black opacity-75 uppercase tracking-wider">User:</span>
+                                    <span className="font-title text-[10px] sm:text-[12px] font-bold truncate max-w-[85px] sm:max-w-none">{activeCashier}</span>
                                 </div>
                             </div>
                         </div>
@@ -357,6 +359,11 @@ function MainRoutes({
 
                     {/* Content Tabs Body */}
                     <main className="pos-body flex-grow overflow-visible relative pb-8">
+                        {/* Decorative background scrapbook doodles */}
+                        <div className="absolute -top-3 -right-2 text-pink font-bold text-lg pointer-events-none select-none opacity-40 hidden sm:block">✦</div>
+                        <div className="absolute top-48 -left-4 text-blue font-bold text-xl pointer-events-none select-none opacity-30 hidden sm:block">★</div>
+                        <div className="absolute bottom-10 right-4 text-yellow font-bold text-2xl pointer-events-none select-none opacity-40 hidden sm:block">✦</div>
+
                         <React.Suspense fallback={<div className="text-center py-12 font-bold text-text/60">Memuat Halaman...</div>}>
                             <Routes>
                                 <Route path="/" element={<Register onCheckoutSuccess={handleCheckoutSuccess} showToast={showToast} activeCashier={activeCashier} />} />

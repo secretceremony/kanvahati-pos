@@ -179,17 +179,26 @@ export default function Bundles({ showToast, currentUser, userRole }) {
     };
 
     return (
-        <div className="bundles-layout lg:h-full h-auto p-4 md:p-6 bg-white border-[3px] border-text rounded-2xl shadow-card relative">
-            <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-1/2 transform translate-x-[-50%] rotate-[-2deg] h-6 w-28 bg-yellow-light border-l border-r border-dashed border-text/25"></div>
+        <div className="bundles-layout lg:h-full h-auto p-4 md:p-6 bg-white border-[3px] border-text rounded-2xl shadow-pop relative overflow-hidden">
+            {/* Retro Window Header */}
+            <div className="retro-window-header -mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-5 bg-pink border-b-[2.5px] border-text px-4 py-2 flex items-center justify-between">
+                <div className="retro-dots flex items-center gap-1.5">
+                    <span className="retro-dot retro-dot-red"></span>
+                    <span className="retro-dot retro-dot-yellow"></span>
+                    <span className="retro-dot retro-dot-blue"></span>
+                    <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Paket Promosi</span>
+                </div>
+                <span className="text-[10px] font-tag font-black uppercase bg-yellow px-2 py-0.5 rounded border border-text shadow-[1px_1px_0px_#171717]">{bundles.length} Bundle</span>
+            </div>
             
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
-                    <h2 className="font-title text-2xl text-text title-stroke"><i className="fa-solid fa-tags"></i> Kelola {t.bundles}</h2>
-                    <p className="text-sm opacity-80 mt-1">Buat paket promosi yang otomatis muncul di terminal kasir.</p>
+                    <h2 className="font-title text-2xl text-text title-stroke"><i className="fa-solid fa-tags text-pink"></i> Kelola {t.bundles}</h2>
+                    <p className="text-sm opacity-80 mt-1 font-body">Buat paket promosi yang otomatis muncul di terminal kasir.</p>
                 </div>
                 <button 
                     onClick={() => handleOpenModal()}
-                    className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] px-5 py-2.5 shadow-btn hover:bg-white hover:translate-y-[-3px] transition-all cursor-pointer flex items-center gap-2"
+                    className="btn bg-pink text-text border-[2.5px] border-text rounded-full font-title text-[13px] px-5 py-2 shadow-btn hover:bg-white hover:translate-y-[-2px] transition-all cursor-pointer flex items-center gap-2 font-bold"
                 >
                     <i className="fa-solid fa-plus"></i> {t.addBundle}
                 </button>
@@ -209,7 +218,7 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                         const discount = originalPrice - bundle.bundlePrice;
                         
                         return (
-                            <div key={bundle.id} className={`bundle-card border-[3px] border-text rounded-2xl p-5 relative transition-all flex flex-col ${bundle.isActive ? 'bg-white shadow-[6px_6px_0px_#32628f]' : 'bg-gray-100 opacity-60'}`}>
+                            <div key={bundle.id} className={`bundle-card border-[3px] border-text rounded-2xl p-5 relative transition-all flex flex-col ${bundle.isActive ? 'bg-white shadow-[6px_6px_0px_#181818]' : 'bg-gray-100 opacity-60'}`}>
                                 {!bundle.isActive && (
                                     <div className="absolute top-2 right-2 bg-text text-white text-[10px] font-bold px-2 py-1 rounded-full">{t.inactive}</div>
                                 )}
@@ -247,13 +256,13 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                                 <div className="flex gap-2 mt-auto">
                                     <button 
                                         onClick={() => handleOpenModal(bundle)}
-                                        className="flex-1 bg-blue-light border-2 border-text rounded-full py-1.5 text-xs font-bold shadow-[2px_2px_0px_#32628f] hover:bg-white transition-colors cursor-pointer"
+                                        className="flex-1 bg-blue-light border-2 border-text rounded-full py-1.5 text-xs font-bold shadow-[2px_2px_0px_#181818] hover:bg-white transition-colors cursor-pointer"
                                     >
                                         Edit
                                     </button>
                                     <button 
                                         onClick={() => handleDelete(bundle.id)}
-                                        className="bg-white text-pink border-2 border-text rounded-full px-3 py-1.5 text-xs shadow-[2px_2px_0px_#32628f] hover:bg-pink-light transition-colors cursor-pointer"
+                                        className="bg-white text-pink border-2 border-text rounded-full px-3 py-1.5 text-xs shadow-[2px_2px_0px_#181818] hover:bg-pink-light transition-colors cursor-pointer"
                                     >
                                         <i className="fa-solid fa-trash"></i>
                                     </button>
@@ -267,7 +276,7 @@ export default function Bundles({ showToast, currentUser, userRole }) {
             {/* Modal Form */}
             {showModal && (
                 <div className="fixed inset-0 bg-text/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white border-[3px] border-text rounded-2xl w-full max-w-[600px] max-h-[90vh] flex flex-col shadow-[8px_8px_0px_#32628f] overflow-hidden animate-[ticketSlide_0.3s_ease-out]">
+                    <div className="bg-white border-[3px] border-text rounded-2xl w-full max-w-[600px] max-h-[90vh] flex flex-col shadow-[8px_8px_0px_#181818] overflow-hidden animate-[ticketSlide_0.3s_ease-out]">
                         <div className="p-5 border-b-[3px] border-text bg-pink-light flex justify-between items-center shrink-0">
                             <h2 className="font-title text-xl text-text title-stroke">
                                 {editingBundle ? "Edit Bundle" : t.addBundle}
@@ -424,7 +433,7 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                             <button 
                                 type="submit"
                                 form="bundle-form"
-                                className="bg-pink text-text px-6 py-2 rounded-full border-[3px] border-text font-bold text-sm shadow-[3px_3px_0px_#32628f] hover:translate-y-[-2px] hover:shadow-[5px_5px_0px_#32628f] transition-all cursor-pointer"
+                                className="bg-pink text-text px-6 py-2 rounded-full border-[3px] border-text font-bold text-sm shadow-[3px_3px_0px_#181818] hover:translate-y-[-2px] hover:shadow-[5px_5px_0px_#181818] transition-all cursor-pointer"
                             >
                                 Simpan Bundle
                             </button>

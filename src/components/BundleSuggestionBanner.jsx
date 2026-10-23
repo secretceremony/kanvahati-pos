@@ -18,7 +18,7 @@ export default function BundleSuggestionBanner({ bundles, onApply, onDismiss }) 
                 return (
                     <div 
                         key={bundle.id} 
-                        className="bg-yellow-light border-[3px] border-text rounded-xl p-3 shadow-[4px_4px_0px_#32628f] animate-[ticketSlide_0.3s_ease-out] relative flex items-center justify-between"
+                        className="bg-yellow-light border-[3px] border-text rounded-xl p-3 shadow-[4px_4px_0px_#181818] animate-[ticketSlide_0.3s_ease-out] relative flex items-center justify-between"
                     >
                         <div className="flex-1 pr-2">
                             <div className="flex items-center gap-2 mb-1">
@@ -46,7 +46,7 @@ export default function BundleSuggestionBanner({ bundles, onApply, onDismiss }) 
                         <div className="flex flex-col gap-1.5 shrink-0">
                             <button 
                                 onClick={() => onApply(bundle)}
-                                className="bg-pink text-text border-2 border-text rounded-full px-3 py-1.5 text-xs font-bold shadow-[2px_2px_0px_#32628f] hover:translate-y-[-1px] transition-all cursor-pointer flex items-center justify-center gap-1"
+                                className="bg-pink text-text border-2 border-text rounded-full px-3 py-1.5 text-xs font-bold shadow-[2px_2px_0px_#181818] hover:translate-y-[-1px] transition-all cursor-pointer flex items-center justify-center gap-1"
                             >
                                 <i className="fa-solid fa-check"></i> Pakai
                             </button>

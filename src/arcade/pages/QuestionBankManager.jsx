@@ -272,7 +272,7 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
                 <div className="washi-tape tape-history absolute top-[-10px] left-8 transform rotate-[-2deg] h-5 w-24 bg-yellow"></div>
                 
                 <div className="flex items-center gap-3">
-                    <div className="bg-yellow text-text border-2 border-text rounded-xl p-2.5 flex items-center justify-center shadow-[2px_2px_0px_#32628f]">
+                    <div className="bg-yellow text-text border-2 border-text rounded-xl p-2.5 flex items-center justify-center shadow-[2px_2px_0px_#181818]">
                         <i className="fa-solid fa-database text-xl"></i>
                     </div>
                     <div>
@@ -284,14 +284,14 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
                 <div className="flex items-center gap-2">
                     <button
                         onClick={handleOpenAdd}
-                        className="btn bg-pink text-text border-2 border-text rounded-xl px-3.5 py-2 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#32628f] hover:bg-white transition-all cursor-pointer"
+                        className="btn bg-pink text-text border-2 border-text rounded-xl px-3.5 py-2 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818] hover:bg-white transition-all cursor-pointer"
                     >
                         <i className="fa-solid fa-plus"></i>
                         <span>Tambah Soal</span>
                     </button>
                     <Link
                         to="/arcade/host"
-                        className="btn bg-white hover:bg-yellow-light border-2 border-text rounded-xl px-3 py-2 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#32628f]"
+                        className="btn bg-white hover:bg-yellow-light border-2 border-text rounded-xl px-3 py-2 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818]"
                     >
                         <i className="fa-solid fa-gamepad text-pink"></i>
                         <span>Host Console</span>
@@ -312,27 +312,27 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
-                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#32628f] text-center">
+                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#181818] text-center">
                         <span className="opacity-70 block text-[10px] uppercase font-bold">Total Soal</span>
                         <span className="font-title text-lg font-black">{assetAudit.totalQuestions}</span>
                     </div>
-                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#32628f] text-center">
+                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#181818] text-center">
                         <span className="opacity-70 block text-[10px] uppercase font-bold text-green-700">Soal Aktif</span>
                         <span className="font-title text-lg font-black text-green-600">{assetAudit.activeCount}</span>
                     </div>
-                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#32628f] text-center">
+                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#181818] text-center">
                         <span className="opacity-70 block text-[10px] uppercase font-bold text-red-700">Soal Nonaktif</span>
                         <span className="font-title text-lg font-black text-red-600">{assetAudit.inactiveCount}</span>
                     </div>
-                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#32628f] text-center">
+                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#181818] text-center">
                         <span className="opacity-70 block text-[10px] uppercase font-bold">Crop Image (G04)</span>
                         <span className="font-title text-lg font-black text-blue">{assetAudit.croppedImagesCount}</span>
                     </div>
-                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#32628f] text-center">
+                    <div className="bg-white border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#181818] text-center">
                         <span className="opacity-70 block text-[10px] uppercase font-bold">Audio Clip (G05)</span>
                         <span className="font-title text-lg font-black text-pink">{assetAudit.audioClipsCount}</span>
                     </div>
-                    <div className="bg-yellow-light/80 border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#32628f] text-center">
+                    <div className="bg-yellow-light/80 border-2 border-text rounded-xl p-2.5 shadow-[2px_2px_0px_#181818] text-center">
                         <span className="opacity-70 block text-[10px] uppercase font-bold text-amber-800">Aset Testing/Mock</span>
                         <span className="font-title text-lg font-black text-amber-700">{assetAudit.placeholderCount}</span>
                     </div>
@@ -352,7 +352,7 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
                 <button
                     onClick={() => setSelectedGameFilter('ALL')}
                     className={`px-3 py-1 rounded-xl text-xs font-title font-bold border-2 border-text transition-all ${
-                        selectedGameFilter === 'ALL' ? 'bg-pink text-text shadow-[2px_2px_0px_#32628f]' : 'bg-white hover:bg-yellow-light'
+                        selectedGameFilter === 'ALL' ? 'bg-pink text-text shadow-[2px_2px_0px_#181818]' : 'bg-white hover:bg-yellow-light'
                     }`}
                 >
                     Semua ({questions.length})
@@ -364,7 +364,7 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
                             key={gId}
                             onClick={() => setSelectedGameFilter(gId)}
                             className={`px-2.5 py-1 rounded-xl text-xs font-title font-bold border-2 border-text transition-all ${
-                                selectedGameFilter === gId ? 'bg-yellow text-text shadow-[2px_2px_0px_#32628f]' : 'bg-white hover:bg-pink-light'
+                                selectedGameFilter === gId ? 'bg-yellow text-text shadow-[2px_2px_0px_#181818]' : 'bg-white hover:bg-pink-light'
                             }`}
                         >
                             {gId} ({count})
@@ -526,7 +526,7 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
             {/* Modal Form for Add/Edit */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white border-[4px] border-text rounded-3xl p-6 max-w-xl w-full shadow-[8px_8px_0px_#32628f] my-8 relative">
+                    <div className="bg-white border-[4px] border-text rounded-3xl p-6 max-w-xl w-full shadow-[8px_8px_0px_#181818] my-8 relative">
                         <div className="flex justify-between items-center mb-4 pb-2 border-b-2 border-text/15">
                             <h2 className="font-title text-base sm:text-lg font-bold">
                                 {editingQuestionId ? `Edit Soal: ${formData.id}` : 'Tambah Soal Baru'}
@@ -776,7 +776,7 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
                                 </button>
                                 <button
                                     type="submit"
-                                    className="btn bg-pink text-text border-2 border-text rounded-xl px-5 py-2 font-title font-bold shadow-[2px_2px_0px_#32628f]"
+                                    className="btn bg-pink text-text border-2 border-text rounded-xl px-5 py-2 font-title font-bold shadow-[2px_2px_0px_#181818]"
                                 >
                                     Simpan Soal
                                 </button>

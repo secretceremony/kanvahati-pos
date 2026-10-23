@@ -1,23 +1,26 @@
 /* --- Google Fonts --- */
-@import url('https://fonts.googleapis.com/css2?family=DynaPuff:wght@400..700&family=Fredoka:wght@300..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DynaPuff:wght@400..700&family=Fredoka:wght@300..700&family=Plus+Jakarta+Sans:wght@700;800;900&display=swap');
 
 @import "tailwindcss";
 
 @theme {
-  --color-pink: #F79DC3;
-  --color-pink-light: #FCE6F1;
-  --color-blue: #87BAE9;
-  --color-blue-light: #E7F2FC;
-  --color-yellow: #FAF0C4;
-  --color-yellow-light: #FFFDF3;
-  --color-text: #32628F;
+  --color-pink: #F786C4;
+  --color-pink-light: #FDE8F3;
+  --color-blue: #7BB1E8;
+  --color-blue-light: #EBF4FC;
+  --color-yellow: #FCE096;
+  --color-yellow-light: #FFF9E6;
+  --color-text: #171717;
   --color-white: #FFFFFF;
+  --color-bg-base: #FFFDF9;
   
   --font-title: 'DynaPuff', system-ui, -apple-system, sans-serif;
   --font-body: 'Fredoka', system-ui, -apple-system, sans-serif;
+  --font-tag: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   
-  --shadow-btn: 4px 4px 0px #32628F;
-  --shadow-card: 6px 6px 0px #32628F;
+  --shadow-btn: 3px 3px 0px #171717;
+  --shadow-card: 4px 4px 0px #171717;
+  --shadow-pop: 5px 5px 0px #171717;
 }
 
 /* --- Global Base Overrides --- */
@@ -25,13 +28,14 @@ body {
   font-family: var(--font-body);
   color: var(--color-text);
   min-height: 100vh;
-  background: linear-gradient(180deg, var(--color-pink) 0%, var(--color-blue) 100%);
+  background-color: var(--color-bg-base);
+  background-image: radial-gradient(#E8DFD0 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
   background-attachment: fixed;
   overflow-x: hidden;
   position: relative;
   font-size: 15px;
   line-height: 1.5;
-  /* Default browser mouse cursor is fully visible */
 }
 
 /* --- Paper Texture Overlay --- */
@@ -46,6 +50,27 @@ body::before {
   pointer-events: none;
   z-index: 9999;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Custom Neobrutalist Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-yellow-light);
+  border-left: 1.5px solid var(--color-text);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-yellow);
+  border: 1.5px solid var(--color-text);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-pink);
 }
 
 /* --- Custom Scallop receipts for thermal print effect --- */
@@ -86,6 +111,94 @@ body::before {
 
 .title-stroke {
   -webkit-text-stroke: 0.5px var(--color-text);
+}
+
+/* Retro OS Window Component */
+.retro-window-header {
+  background-color: var(--color-blue);
+  border-bottom: 2.5px solid var(--color-text);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.retro-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.retro-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--color-text);
+  display: inline-block;
+}
+
+.retro-dot-red { 
+  background-color: var(--color-pink) !important; 
+}
+
+.retro-dot-yellow { 
+  background-color: var(--color-yellow) !important; 
+}
+
+.retro-dot-blue { 
+  background-color: var(--color-blue) !important; 
+}
+
+/* Neobrutalist Tag / Badge */
+.sticker-tag {
+  font-family: var(--font-tag);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 2px solid var(--color-text);
+  box-shadow: 2px 2px 0px var(--color-text);
+}
+
+/* Y2K Die-Cut Sticker Style (Proof of Concept reference) */
+.sticker-cutout {
+  border: 2.5px solid var(--color-text);
+  box-shadow: 4px 4px 0px var(--color-text);
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sticker-cutout:hover {
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0px var(--color-text);
+}
+
+/* Starburst / Explosion badge */
+.badge-starburst {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-tag);
+  font-weight: 900;
+  text-transform: uppercase;
+  border: 2px solid var(--color-text);
+  box-shadow: 2.5px 2.5px 0px var(--color-text);
+  transform: rotate(-3deg);
+}
+
+/* Washi tape strip decoration */
+.tape-strip {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  width: 55px;
+  height: 14px;
+  background-color: rgba(252, 224, 150, 0.85);
+  border-left: 1px dashed rgba(23, 23, 23, 0.4);
+  border-right: 1px dashed rgba(23, 23, 23, 0.4);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  z-index: 10;
+  pointer-events: none;
 }
 
 /* --- Rekapan expand animation --- */

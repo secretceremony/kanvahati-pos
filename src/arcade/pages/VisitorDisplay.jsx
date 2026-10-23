@@ -170,7 +170,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
             }}
         >
             {/* Top Kiosk Bar */}
-            <header className="kiosk-header w-full bg-white/95 backdrop-blur-sm border-b-[3px] border-text px-4 py-2.5 flex justify-between items-center shadow-[0_4px_0px_#32628f] z-40 shrink-0">
+            <header className="kiosk-header w-full bg-white/95 backdrop-blur-sm border-b-[3px] border-text px-4 py-2.5 flex justify-between items-center shadow-[0_4px_0px_#181818] z-40 shrink-0">
                 <div className="flex items-center gap-3">
                     <img 
                         src="/kanvahati-logo.png" 
@@ -181,7 +181,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
                         <span className="font-title text-sm md:text-base font-bold text-text tracking-wide">
                             KANVAHATI ARCADE
                         </span>
-                        <span className="hidden sm:inline-block bg-yellow text-text border-2 border-text rounded-full px-2.5 py-0.5 text-[11px] font-title font-bold shadow-[1.5px_1.5px_0px_#32628f]">
+                        <span className="hidden sm:inline-block bg-yellow text-text border-2 border-text rounded-full px-2.5 py-0.5 text-[11px] font-title font-bold shadow-[1.5px_1.5px_0px_#181818]">
                             {eventId} • {stationId.toUpperCase()}
                         </span>
                     </div>
@@ -189,7 +189,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
 
                 <div className="flex items-center gap-2 sm:gap-3">
                     {/* Connection Status Indicator */}
-                    <div className={`connection-pill flex items-center gap-1.5 border-2 border-text rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-[1.5px_1.5px_0px_#32628f] ${
+                    <div className={`connection-pill flex items-center gap-1.5 border-2 border-text rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-[1.5px_1.5px_0px_#181818] ${
                         connectionStatus === 'online' ? 'bg-green-100 text-green-800' :
                         connectionStatus === 'connecting' ? 'bg-yellow-light text-amber-800' : 'bg-red-100 text-red-800'
                     }`}>
@@ -217,7 +217,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
                     {/* Fullscreen Button */}
                     <button
                         onClick={toggleFullscreen}
-                        className="btn bg-pink text-text border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#32628f] hover:bg-white transition-all cursor-pointer"
+                        className="btn bg-pink text-text border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818] hover:bg-white transition-all cursor-pointer"
                         title={isFullscreen ? "Keluar Fullscreen" : "Layar Penuh (Kiosk)"}
                     >
                         <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
@@ -286,7 +286,7 @@ function IdleScreen({ eventId, stationId }) {
     return (
         <div className="w-full max-w-4xl flex flex-col items-center text-center animate-[fadeIn_0.5s_ease-out]">
             {/* Header Kawaii Badge */}
-            <div className="inline-flex items-center gap-2 bg-yellow border-[3px] border-text rounded-full px-4 py-1.5 shadow-[3px_3px_0px_#32628f] mb-4">
+            <div className="inline-flex items-center gap-2 bg-yellow border-[3px] border-text rounded-full px-4 py-1.5 shadow-[3px_3px_0px_#181818] mb-4">
                 <span className="text-base">✨</span>
                 <span className="font-title text-xs sm:text-sm font-bold uppercase tracking-wider">
                     Anime & Fandom Mini-Challenge
@@ -304,22 +304,22 @@ function IdleScreen({ eventId, stationId }) {
 
             {/* 4 Feature Info Cards Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full mb-8">
-                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#32628f] flex flex-col items-center">
+                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#181818] flex flex-col items-center">
                     <span className="text-3xl mb-2">🎲</span>
                     <h3 className="font-title text-sm sm:text-base font-bold text-text mb-1">10 Tantangan</h3>
                     <p className="text-[11px] text-text/70 leading-snug">Speedrun, Guess OP, Dere Rubric, Impostor, dll.</p>
                 </div>
-                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#32628f] flex flex-col items-center">
+                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#181818] flex flex-col items-center">
                     <span className="text-3xl mb-2">⏱️</span>
                     <h3 className="font-title text-sm sm:text-base font-bold text-text mb-1">Batas 30 Detik</h3>
                     <p className="text-[11px] text-text/70 leading-snug">Timer cepat tanpa jeda, tanpa hint bantuan teman.</p>
                 </div>
-                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#32628f] flex flex-col items-center">
+                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#181818] flex flex-col items-center">
                     <span className="text-3xl mb-2">🎨</span>
                     <h3 className="font-title text-sm sm:text-base font-bold text-text mb-1">Hadiah Menang</h3>
                     <p className="text-[11px] text-text/70 leading-snug">Free Frame Live Sketch Commission + Sticker!</p>
                 </div>
-                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#32628f] flex flex-col items-center">
+                <div className="bg-white border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#181818] flex flex-col items-center">
                     <span className="text-3xl mb-2">🎁</span>
                     <h3 className="font-title text-sm sm:text-base font-bold text-text mb-1">Hadiah Kalah</h3>
                     <p className="text-[11px] text-text/70 leading-snug">Semua peserta tetap mendapat Sticker Freebie!</p>
@@ -327,7 +327,7 @@ function IdleScreen({ eventId, stationId }) {
             </div>
 
             {/* Waiting for Host Callout Pulse Card */}
-            <div className="w-full max-w-lg bg-pink-light/60 border-[3px] border-text rounded-2xl p-5 shadow-[4px_4px_0px_#32628f] flex items-center justify-center gap-3 animate-pulse">
+            <div className="w-full max-w-lg bg-pink-light/60 border-[3px] border-text rounded-2xl p-5 shadow-[4px_4px_0px_#181818] flex items-center justify-center gap-3 animate-pulse">
                 <i className="fa-solid fa-gamepad text-2xl text-pink animate-bounce"></i>
                 <div className="text-left">
                     <div className="font-title text-sm sm:text-base font-bold text-text">
@@ -354,7 +354,7 @@ function ReadyScreen({ session, gameDef }) {
     return (
         <div className="w-full max-w-3xl flex flex-col items-center text-center animate-[scaleUp_0.4s_cubic-bezier(0.175,0.885,0.32,1.15)]">
             {/* Booth Status Badge (No Personal Names on Display) */}
-            <div className="inline-flex items-center gap-2 bg-blue-light border-[3px] border-text rounded-full px-5 py-1.5 shadow-[3px_3px_0px_#32628f] mb-4">
+            <div className="inline-flex items-center gap-2 bg-blue-light border-[3px] border-text rounded-full px-5 py-1.5 shadow-[3px_3px_0px_#181818] mb-4">
                 <i className="fa-solid fa-gamepad text-sm"></i>
                 <span className="font-title text-sm sm:text-base font-bold text-text uppercase tracking-wider">
                     GILIRAN BERMAIN
@@ -362,10 +362,10 @@ function ReadyScreen({ session, gameDef }) {
             </div>
 
             {/* Challenge Title Card */}
-            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_#32628f] relative mb-6">
+            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_#181818] relative mb-6">
                 <div className="washi-tape tape-yellow-1 absolute top-[-14px] left-1/2 -translate-x-1/2 h-7 w-32 bg-yellow"></div>
                 
-                <span className="inline-block bg-pink text-text border-2 border-text rounded-full px-3 py-1 font-title text-xs font-bold mb-3 shadow-[1.5px_1.5px_0px_#32628f]">
+                <span className="inline-block bg-pink text-text border-2 border-text rounded-full px-3 py-1 font-title text-xs font-bold mb-3 shadow-[1.5px_1.5px_0px_#181818]">
                     {gameId} • 30 DETIK
                 </span>
                 
@@ -392,7 +392,7 @@ function ReadyScreen({ session, gameDef }) {
             </div>
 
             {/* Countdown Ready Pulsing Card */}
-            <div className="inline-flex items-center gap-3 bg-yellow border-[3px] border-text rounded-full px-6 py-2.5 shadow-[4px_4px_0px_#32628f] animate-bounce">
+            <div className="inline-flex items-center gap-3 bg-yellow border-[3px] border-text rounded-full px-6 py-2.5 shadow-[4px_4px_0px_#181818] animate-bounce">
                 <i className="fa-solid fa-flag-checkered text-xl text-text"></i>
                 <span className="font-title text-sm sm:text-base font-bold text-text">
                     BERSIAP! Game akan segera dimulai oleh Host...
@@ -419,8 +419,8 @@ function PlayingScreen({ session, gameDef, remainingSeconds, timerProgress }) {
             {/* Top Challenge Header & Live Timer Grid */}
             <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
                 {/* Challenge Info Badge */}
-                <div className="bg-white border-[3px] border-text rounded-2xl px-5 py-2.5 shadow-[4px_4px_0px_#32628f] flex items-center gap-3 w-full sm:w-auto">
-                    <div className="w-10 h-10 rounded-xl bg-pink border-2 border-text flex items-center justify-center font-title font-black text-text shadow-[1.5px_1.5px_0px_#32628f] text-sm shrink-0">
+                <div className="bg-white border-[3px] border-text rounded-2xl px-5 py-2.5 shadow-[4px_4px_0px_#181818] flex items-center gap-3 w-full sm:w-auto">
+                    <div className="w-10 h-10 rounded-xl bg-pink border-2 border-text flex items-center justify-center font-title font-black text-text shadow-[1.5px_1.5px_0px_#181818] text-sm shrink-0">
                         {gameId}
                     </div>
                     <div>
@@ -434,7 +434,7 @@ function PlayingScreen({ session, gameDef, remainingSeconds, timerProgress }) {
                 </div>
 
                 {/* Big 30-Second Countdown Timer Card */}
-                <div className={`countdown-card border-[3px] border-text rounded-2xl px-6 py-2 shadow-[4px_4px_0px_#32628f] flex items-center gap-3 transition-colors duration-300 w-full sm:w-auto justify-center ${
+                <div className={`countdown-card border-[3px] border-text rounded-2xl px-6 py-2 shadow-[4px_4px_0px_#181818] flex items-center gap-3 transition-colors duration-300 w-full sm:w-auto justify-center ${
                     isUrgent ? 'bg-red-400 text-white animate-pulse' : 'bg-yellow text-text'
                 }`}>
                     <i className={`fa-solid fa-stopwatch text-2xl ${isUrgent ? 'animate-spin' : ''}`}></i>
@@ -450,7 +450,7 @@ function PlayingScreen({ session, gameDef, remainingSeconds, timerProgress }) {
             </div>
 
             {/* Dedicated Challenge Center Stage */}
-            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-5 sm:p-7 shadow-[8px_8px_0px_#32628f] relative mb-6">
+            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-5 sm:p-7 shadow-[8px_8px_0px_#181818] relative mb-6">
                 <div className="washi-tape tape-yellow-1 absolute top-[-14px] left-1/2 -translate-x-1/2 h-7 w-32 bg-pink-light"></div>
 
                 {/* Render Challenge-Specific View */}
@@ -487,7 +487,7 @@ function PlayingScreen({ session, gameDef, remainingSeconds, timerProgress }) {
             </div>
 
             {/* Timer Progress Bar */}
-            <div className="w-full bg-white border-2 border-text rounded-full h-4 overflow-hidden shadow-[2px_2px_0px_#32628f] p-0.5">
+            <div className="w-full bg-white border-2 border-text rounded-full h-4 overflow-hidden shadow-[2px_2px_0px_#181818] p-0.5">
                 <div 
                     className={`h-full rounded-full transition-all duration-200 ${
                         isUrgent ? 'bg-red-500' : 'bg-pink'
@@ -524,7 +524,7 @@ function G01DisplayView({ session, currentProgress, targetProgress }) {
                         return (
                             <div 
                                 key={idx}
-                                className={`h-11 rounded-xl border-2 border-text flex items-center justify-center font-title font-bold text-sm shadow-[2px_2px_0px_#32628f] transition-all ${
+                                className={`h-11 rounded-xl border-2 border-text flex items-center justify-center font-title font-bold text-sm shadow-[2px_2px_0px_#181818] transition-all ${
                                     isDone ? 'bg-green-400 text-white scale-105' : 'bg-blue-light/30 text-text/40'
                                 }`}
                             >
@@ -550,7 +550,7 @@ function G02DisplayView({ session, currentProgress, targetProgress }) {
             </h3>
             
             {/* Big Trait Badge */}
-            <div className="bg-yellow border-[3px] border-text rounded-2xl px-6 py-3 shadow-[4px_4px_0px_#32628f] mb-6">
+            <div className="bg-yellow border-[3px] border-text rounded-2xl px-6 py-3 shadow-[4px_4px_0px_#181818] mb-6">
                 <span className="font-title text-2xl sm:text-3xl font-black text-text">
                     "{trait}"
                 </span>
@@ -568,7 +568,7 @@ function G02DisplayView({ session, currentProgress, targetProgress }) {
                         return (
                             <div 
                                 key={idx}
-                                className={`h-12 rounded-xl border-2 border-text flex items-center justify-center font-title font-bold text-base shadow-[2px_2px_0px_#32628f] transition-all ${
+                                className={`h-12 rounded-xl border-2 border-text flex items-center justify-center font-title font-bold text-base shadow-[2px_2px_0px_#181818] transition-all ${
                                     isDone ? 'bg-green-400 text-white scale-105' : 'bg-blue-light/30 text-text/40'
                                 }`}
                             >
@@ -602,7 +602,7 @@ function G03DisplayView({ session, currentProgress, targetProgress }) {
                     return (
                         <div 
                             key={num}
-                            className={`p-3.5 rounded-2xl border-[3px] border-text shadow-[4px_4px_0px_#32628f] flex flex-col items-center transition-all ${
+                            className={`p-3.5 rounded-2xl border-[3px] border-text shadow-[4px_4px_0px_#181818] flex flex-col items-center transition-all ${
                                 isDone ? 'bg-green-100 border-green-800' : 'bg-white'
                             }`}
                         >
@@ -631,13 +631,13 @@ function G04DisplayView({ session }) {
             <p className="text-xs text-text/70 mb-4">Sebutkan judul anime secara langsung kepada panitia.</p>
 
             {/* Cropped Image Box */}
-            <div className="w-full max-w-md bg-white border-[3px] border-text rounded-2xl overflow-hidden shadow-[5px_5px_0px_#32628f] flex items-center justify-center relative p-3">
+            <div className="w-full max-w-md bg-white border-[3px] border-text rounded-2xl overflow-hidden shadow-[5px_5px_0px_#181818] flex items-center justify-center relative p-3">
                 <img 
                     src={croppedUrl} 
                     alt="Potongan Gambar Misteri" 
                     className="w-full max-h-[300px] object-contain rounded-xl border border-text/20 bg-slate-50"
                 />
-                <span className="absolute bottom-4 right-4 bg-yellow border-2 border-text px-2 py-0.5 rounded text-[10px] font-title font-bold text-text shadow-[1.5px_1.5px_0px_#32628f]">
+                <span className="absolute bottom-4 right-4 bg-yellow border-2 border-text px-2 py-0.5 rounded text-[10px] font-title font-bold text-text shadow-[1.5px_1.5px_0px_#181818]">
                     🔍 TEBAK GAMBAR
                 </span>
             </div>
@@ -657,8 +657,8 @@ function G05DisplayView({ session }) {
             <p className="text-xs text-text/70 mb-6">Dengarkan audio 3–5 detik yang diputar di booth panitia.</p>
 
             {/* Audio Wave / Record Graphic */}
-            <div className="w-full max-w-md bg-yellow-light/60 border-[3px] border-text rounded-2xl p-6 shadow-[5px_5px_0px_#32628f] flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full bg-pink border-[3px] border-text flex items-center justify-center shadow-[3px_3px_0px_#32628f] mb-4 animate-spin" style={{ animationDuration: '4s' }}>
+            <div className="w-full max-w-md bg-yellow-light/60 border-[3px] border-text rounded-2xl p-6 shadow-[5px_5px_0px_#181818] flex flex-col items-center">
+                <div className="w-20 h-20 rounded-full bg-pink border-[3px] border-text flex items-center justify-center shadow-[3px_3px_0px_#181818] mb-4 animate-spin" style={{ animationDuration: '4s' }}>
                     <div className="w-6 h-6 rounded-full bg-white border-2 border-text"></div>
                 </div>
 
@@ -697,7 +697,7 @@ function G06DisplayView({ session, currentProgress, targetProgress }) {
             </h3>
 
             {/* Giant Alphabet Badge */}
-            <div className="w-24 h-24 rounded-3xl bg-pink border-[4px] border-text flex items-center justify-center shadow-[6px_6px_0px_#32628f] mb-6 animate-bounce">
+            <div className="w-24 h-24 rounded-3xl bg-pink border-[4px] border-text flex items-center justify-center shadow-[6px_6px_0px_#181818] mb-6 animate-bounce">
                 <span className="font-title text-5xl font-black text-text">
                     {letter}
                 </span>
@@ -715,7 +715,7 @@ function G06DisplayView({ session, currentProgress, targetProgress }) {
                         return (
                             <div 
                                 key={idx}
-                                className={`h-12 rounded-xl border-2 border-text flex items-center justify-center font-title font-bold text-base shadow-[2px_2px_0px_#32628f] transition-all ${
+                                className={`h-12 rounded-xl border-2 border-text flex items-center justify-center font-title font-bold text-base shadow-[2px_2px_0px_#181818] transition-all ${
                                     isDone ? 'bg-green-400 text-white scale-105' : 'bg-blue-light/30 text-text/40'
                                 }`}
                             >
@@ -742,7 +742,7 @@ function G07DisplayView({ session, currentProgress }) {
                 Dengarkan 3 Ciri-Ciri Karakter dari Panitia!
             </h3>
             
-            <div className="w-full max-w-md bg-yellow border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#32628f] mb-6">
+            <div className="w-full max-w-md bg-yellow border-[3px] border-text rounded-2xl p-4 shadow-[4px_4px_0px_#181818] mb-6">
                 <p className="text-xs sm:text-sm text-text font-medium leading-relaxed">
                     Panitia akan membacakan maksimal <strong>3 ciri khas / petunjuk</strong> secara lisan. 
                     <br/><span className="text-pink font-bold">Tebak nama karakternya dengan tepat sebelum batas waktu habis!</span>
@@ -754,7 +754,7 @@ function G07DisplayView({ session, currentProgress }) {
                 {[1, 2, 3].map((num) => (
                     <div 
                         key={num}
-                        className="py-3 px-2 rounded-2xl border-2 border-text bg-white shadow-[2px_2px_0px_#32628f] flex flex-col items-center"
+                        className="py-3 px-2 rounded-2xl border-2 border-text bg-white shadow-[2px_2px_0px_#181818] flex flex-col items-center"
                     >
                         <span className="font-title text-xs font-bold text-text mb-0.5">Petunjuk #{num}</span>
                         <span className="text-[11px] text-text/60">📢 Dibacakan Host</span>
@@ -780,13 +780,13 @@ function G08DisplayView({ session }) {
 
             {/* Pose Reference Image Showcase */}
             {poseImageUrl && (
-                <div className="w-full max-w-xs sm:max-w-sm rounded-3xl border-[4px] border-text overflow-hidden shadow-[6px_6px_0px_#32628f] mb-4 bg-white p-2.5 relative">
+                <div className="w-full max-w-xs sm:max-w-sm rounded-3xl border-[4px] border-text overflow-hidden shadow-[6px_6px_0px_#181818] mb-4 bg-white p-2.5 relative">
                     <img 
                         src={poseImageUrl} 
                         alt="Anime Pose Reference" 
                         className="w-full max-h-[360px] object-contain rounded-2xl mx-auto"
                     />
-                    <div className="absolute top-4 right-4 bg-yellow border-2 border-text px-2.5 py-0.5 rounded-full text-[10px] font-title font-bold shadow-[2px_2px_0px_#32628f]">
+                    <div className="absolute top-4 right-4 bg-yellow border-2 border-text px-2.5 py-0.5 rounded-full text-[10px] font-title font-bold shadow-[2px_2px_0px_#181818]">
                         📸 CONTOH POSE
                     </div>
                 </div>
@@ -829,7 +829,7 @@ function G09DisplayView({ session }) {
                 {options.map((opt, idx) => (
                     <div 
                         key={idx}
-                        className="bg-white border-[3px] border-text rounded-2xl p-3.5 shadow-[3px_3px_0px_#32628f] flex items-center gap-3 text-left"
+                        className="bg-white border-[3px] border-text rounded-2xl p-3.5 shadow-[3px_3px_0px_#181818] flex items-center gap-3 text-left"
                     >
                         <div className="w-8 h-8 rounded-xl bg-yellow border-2 border-text flex items-center justify-center font-title font-bold text-sm shrink-0">
                             {idx + 1}
@@ -866,7 +866,7 @@ function G10DisplayView({ session }) {
                 {options.map((opt, idx) => (
                     <div 
                         key={idx}
-                        className="bg-white border-[3px] border-text rounded-2xl p-3.5 shadow-[3px_3px_0px_#32628f] flex items-center gap-3 text-left"
+                        className="bg-white border-[3px] border-text rounded-2xl p-3.5 shadow-[3px_3px_0px_#181818] flex items-center gap-3 text-left"
                     >
                         <div className="w-8 h-8 rounded-xl bg-pink border-2 border-text flex items-center justify-center font-title font-bold text-sm shrink-0">
                             {idx + 1}
@@ -889,7 +889,7 @@ function WonScreen({ session, gameDef }) {
         <div className="w-full max-w-3xl flex flex-col items-center text-center animate-[popIn_0.5s_cubic-bezier(0.175,0.885,0.32,1.15)]">
             
             {/* Victory Badge */}
-            <div className="inline-flex items-center gap-2 bg-yellow border-[3px] border-text rounded-full px-5 py-1.5 shadow-[3px_3px_0px_#32628f] mb-3 animate-bounce">
+            <div className="inline-flex items-center gap-2 bg-yellow border-[3px] border-text rounded-full px-5 py-1.5 shadow-[3px_3px_0px_#181818] mb-3 animate-bounce">
                 <span className="text-xl">🏆</span>
                 <span className="font-title text-sm sm:text-base font-bold text-text uppercase tracking-wider">
                     MISI TERCAPAI • LUAR BIASA!
@@ -906,7 +906,7 @@ function WonScreen({ session, gameDef }) {
             </p>
 
             {/* Prize Showcase Card */}
-            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_#32628f] relative mb-6">
+            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_#181818] relative mb-6">
                 <div className="washi-tape tape-yellow-1 absolute top-[-14px] left-1/2 -translate-x-1/2 h-7 w-36 bg-green-300"></div>
 
                 <h3 className="font-title text-lg sm:text-xl font-bold text-text mb-4">
@@ -915,7 +915,7 @@ function WonScreen({ session, gameDef }) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                     {/* Sketch Commission */}
-                    <div className="bg-yellow-light/60 border-[3px] border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f] flex items-start gap-3">
+                    <div className="bg-yellow-light/60 border-[3px] border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818] flex items-start gap-3">
                         <span className="text-3xl shrink-0">🎨</span>
                         <div>
                             <div className="font-title text-sm font-bold text-text">Free Frame Live Sketch</div>
@@ -926,7 +926,7 @@ function WonScreen({ session, gameDef }) {
                     </div>
 
                     {/* Sticker Freebie */}
-                    <div className="bg-pink-light/60 border-[3px] border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f] flex items-start gap-3">
+                    <div className="bg-pink-light/60 border-[3px] border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818] flex items-start gap-3">
                         <span className="text-3xl shrink-0">🌸</span>
                         <div>
                             <div className="font-title text-sm font-bold text-text">Sticker Freebie Eksklusif</div>
@@ -940,7 +940,7 @@ function WonScreen({ session, gameDef }) {
                 {/* Evaluation: Correct Answer Confirmation Card */}
                 {session?.revealedAnswer && (
                     <div className="mt-5 pt-4 border-t-2 border-dashed border-text/20 w-full max-w-xl mx-auto flex flex-col gap-3">
-                        <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-left shadow-[3px_3px_0px_#32628f]">
+                        <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-left shadow-[3px_3px_0px_#181818]">
                             <div className="flex items-center gap-2 mb-1.5">
                                 <span className="bg-emerald-600 text-white text-[11px] font-title font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                                     ✅ JAWABAN TEPAT & BENAR
@@ -1000,7 +1000,7 @@ function LostScreen({ session, gameDef }) {
         <div className="w-full max-w-3xl flex flex-col items-center text-center animate-[shake_0.5s_ease-in-out]">
             
             {/* Consolation Badge */}
-            <div className="inline-flex items-center gap-2 bg-pink border-[3px] border-text rounded-full px-5 py-1.5 shadow-[3px_3px_0px_#32628f] mb-3">
+            <div className="inline-flex items-center gap-2 bg-pink border-[3px] border-text rounded-full px-5 py-1.5 shadow-[3px_3px_0px_#181818] mb-3">
                 <span className="text-xl">🥺</span>
                 <span className="font-title text-sm sm:text-base font-bold text-text uppercase tracking-wider">
                     BELUM BERHASIL
@@ -1020,14 +1020,14 @@ function LostScreen({ session, gameDef }) {
             </p>
 
             {/* Consolation Prize Showcase Card */}
-            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_#32628f] relative mb-6">
+            <div className="w-full bg-white border-[4px] border-text rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_#181818] relative mb-6">
                 <div className="washi-tape tape-yellow-1 absolute top-[-14px] left-1/2 -translate-x-1/2 h-7 w-36 bg-yellow"></div>
 
                 <h3 className="font-title text-lg sm:text-xl font-bold text-text mb-4">
                     🎁 Hadiah Penghiburan Anda:
                 </h3>
 
-                <div className="bg-pink-light/60 border-[3px] border-text rounded-2xl p-4 shadow-[3px_3px_0px_#32628f] flex items-center justify-center gap-4 text-left max-w-md mx-auto mb-4">
+                <div className="bg-pink-light/60 border-[3px] border-text rounded-2xl p-4 shadow-[3px_3px_0px_#181818] flex items-center justify-center gap-4 text-left max-w-md mx-auto mb-4">
                     <span className="text-4xl shrink-0">🌸</span>
                     <div>
                         <div className="font-title text-sm sm:text-base font-bold text-text">Sticker Freebie Kanvahati</div>
@@ -1040,7 +1040,7 @@ function LostScreen({ session, gameDef }) {
                 {/* Evaluation: Comparison between False Answer and Correct Answer */}
                 <div className="mt-5 pt-4 border-t-2 border-dashed border-text/20 w-full max-w-xl mx-auto flex flex-col gap-3">
                     {/* 1. False Answer / Failed Reason */}
-                    <div className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 text-left shadow-[3px_3px_0px_#32628f]">
+                    <div className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 text-left shadow-[3px_3px_0px_#181818]">
                         <div className="flex items-center gap-2 mb-1.5">
                             <span className="bg-rose-500 text-white text-[11px] font-title font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                                 ❌ JAWABAN SALAH / GAGAL
@@ -1056,7 +1056,7 @@ function LostScreen({ session, gameDef }) {
 
                     {/* 2. Correct Answer Key */}
                     {session?.revealedAnswer && (
-                        <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-left shadow-[3px_3px_0px_#32628f]">
+                        <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-left shadow-[3px_3px_0px_#181818]">
                             <div className="flex items-center gap-2 mb-1.5">
                                 <span className="bg-emerald-600 text-white text-[11px] font-title font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                                     ✅ KUNCI JAWABAN YANG BENAR

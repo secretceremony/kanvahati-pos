@@ -135,9 +135,8 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
     return (
         <div className="superadmin-hub-layout w-full h-auto flex flex-col gap-5 font-body text-text pb-10">
             {/* Top Bar: Title & Navigation Tabs */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border-[3px] border-text rounded-2xl shadow-card p-4 sm:px-6 relative shrink-0">
-                <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-2deg] h-5 w-24 bg-yellow-light border-l border-r border-dashed border-text/25"></div>
-
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border-[2.5px] border-text rounded-2xl shadow-card p-4 sm:px-6 relative shrink-0 overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-yellow border-b border-text"></div>
                 <div>
                     <h3 className="font-title text-xl text-text title-stroke flex items-center gap-2">
                         <i className="fa-solid fa-shield-halved text-pink"></i> Kontrol Kredensial & Audit
@@ -148,13 +147,13 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                 </div>
                 
                 {/* Hub Navigation Tabs */}
-                <div className="flex gap-2 bg-yellow-light/40 border-2 border-text p-1.5 rounded-full font-title text-xs shrink-0">
+                <div className="flex gap-2 bg-yellow-light border-2 border-text p-1.5 rounded-full font-title text-xs shrink-0 shadow-[1px_1px_0px_#181818]">
                     <button
                         type="button"
                         onClick={() => setActiveTab('staff')}
                         className={`px-4 py-1.5 rounded-full cursor-pointer transition-all ${
                             activeTab === 'staff' 
-                                ? 'bg-yellow text-text border-2 border-text shadow-[2px_2px_0px_#32628f]' 
+                                ? 'bg-yellow text-text border-2 border-text shadow-[2px_2px_0px_#181818]' 
                                 : 'text-text hover:bg-white border-2 border-transparent'
                         }`}
                     >
@@ -165,7 +164,7 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                         onClick={() => setActiveTab('audit')}
                         className={`px-4 py-1.5 rounded-full cursor-pointer transition-all ${
                             activeTab === 'audit' 
-                                ? 'bg-yellow text-text border-2 border-text shadow-[2px_2px_0px_#32628f]' 
+                                ? 'bg-yellow text-text border-2 border-text shadow-[2px_2px_0px_#181818]' 
                                 : 'text-text hover:bg-white border-2 border-transparent'
                         }`}
                     >
@@ -178,9 +177,19 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
             {activeTab === 'staff' && (
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-5 items-start">
                     {/* Form Input Staf */}
-                    <div className="bg-yellow-light border-[3px] border-text rounded-2xl p-5 shadow-card relative shrink-0">
-                        <div className="washi-tape tape-history absolute top-[-10px] left-8 transform rotate-[-2deg] h-5 w-20 border-l border-r border-dashed border-text/25 bg-pink-light"></div>
+                    <div className="bg-yellow-light border-[3px] border-text rounded-2xl overflow-hidden shadow-pop relative shrink-0">
+                        {/* Retro Window Header */}
+                        <div className="retro-window-header bg-yellow border-b-[2.5px] border-text px-4 py-2 flex items-center justify-between">
+                            <div className="retro-dots flex items-center gap-1.5">
+                                <span className="retro-dot retro-dot-red"></span>
+                                <span className="retro-dot retro-dot-yellow"></span>
+                                <span className="retro-dot retro-dot-blue"></span>
+                                <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Konfigurasi Akun</span>
+                            </div>
+                            <span className="text-[10px] font-tag font-black uppercase bg-white border border-text px-2 py-0.5 rounded shadow-[1px_1px_0px_#171717]">Akun Staf</span>
+                        </div>
 
+                        <div className="p-5 flex flex-col">
                         <h4 className="font-title text-base mb-3 flex items-center gap-2 title-stroke text-text">
                             <i className="fa-solid fa-user-plus"></i>
                             {isEditingStaff ? 'Edit Kredensial Staf' : 'Tambah / Konfigurasi Akun'}
@@ -248,7 +257,7 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                         type="button"
                                         onClick={() => {
                                             setIsEditingStaff(false);
-                                            setStaffForm({ uid: '', email: '', displayName: '', role: 'cashier' });
+                                            setStaffForm({ uid: '', email: '', displayName: '', role: 'cashier', password: '' });
                                         }}
                                         className="btn bg-white text-text border-[3px] border-text rounded-full font-title text-xs py-2.5 px-3 hover:bg-yellow-light active:translate-y-[1px] cursor-pointer transition-all"
                                     >
@@ -257,12 +266,22 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                 )}
                             </div>
                         </form>
+                        </div>
                     </div>
 
                     {/* Daftar Akun Terdaftar */}
-                    <div className="border-[3px] border-text rounded-2xl overflow-hidden shadow-card bg-white">
-                        <div className="bg-blue-light border-b-2 border-text p-3 sm:px-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <span className="font-title text-sm font-bold text-text title-stroke">Daftar Akun Tim Resmi</span>
+                    <div className="border-[3px] border-text rounded-2xl overflow-hidden shadow-pop bg-white">
+                        <div className="retro-window-header bg-blue border-b-[2.5px] border-text px-4 py-2 flex items-center justify-between">
+                            <div className="retro-dots flex items-center gap-1.5">
+                                <span className="retro-dot retro-dot-red"></span>
+                                <span className="retro-dot retro-dot-yellow"></span>
+                                <span className="retro-dot retro-dot-blue"></span>
+                                <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Akun Tim Resmi</span>
+                            </div>
+                            <span className="text-[10px] font-tag font-black uppercase bg-yellow px-2 py-0.5 rounded border border-text shadow-[1px_1px_0px_#171717]">{staffList.length} Akun</span>
+                        </div>
+                        <div className="bg-blue-light/40 border-b-2 border-text p-3 sm:px-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <span className="font-title text-xs font-bold text-text">Daftar Akun Terdaftar</span>
                             <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
                                 <button 
                                     onClick={async () => {
@@ -276,14 +295,14 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                         await loadStaff();
                                         showToast("Kredensial tim resmi berhasil disinkronkan!", "🌱");
                                     }} 
-                                    className="text-[11px] sm:text-xs bg-white border-2 border-text px-2.5 py-1 rounded-full font-title font-bold text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#32628f] cursor-pointer transition-all flex items-center"
+                                    className="text-[11px] sm:text-xs bg-white border-2 border-text px-2.5 py-1 rounded-full font-title font-bold text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#181818] cursor-pointer transition-all flex items-center"
                                     title="Sinkronkan akun bawaan"
                                 >
                                     <i className="fa-solid fa-seedling mr-1 text-green-600"></i> Sinkron Bawaan
                                 </button>
                                 <button 
                                     onClick={loadStaff} 
-                                    className="text-[11px] sm:text-xs bg-white border-2 border-text px-2.5 py-1 rounded-full font-title font-bold text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#32628f] cursor-pointer transition-all flex items-center"
+                                    className="text-[11px] sm:text-xs bg-white border-2 border-text px-2.5 py-1 rounded-full font-title font-bold text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#181818] cursor-pointer transition-all flex items-center"
                                 >
                                     <i className="fa-solid fa-arrows-rotate mr-1"></i> Segarkan
                                 </button>
@@ -299,7 +318,7 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                     {/* 1. Mobile Card List (< lg) */}
                                     <div className="block lg:hidden space-y-2.5">
                                         {staffList.map(st => (
-                                            <div key={st.uid || st.email} className="bg-yellow-light/20 border-2 border-text rounded-xl p-3 shadow-[1.5px_1.5px_0px_#32628f] flex flex-col gap-2">
+                                            <div key={st.uid || st.email} className="bg-yellow-light/20 border-2 border-text rounded-xl p-3 shadow-[1.5px_1.5px_0px_#181818] flex flex-col gap-2">
                                                 <div className="flex justify-between items-start gap-2">
                                                     <div>
                                                         <div className="font-bold font-title text-sm flex items-center gap-1.5">
@@ -334,13 +353,13 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                                                 role: st.role || 'cashier'
                                                             });
                                                         }}
-                                                        className="btn flex-1 bg-white border-2 border-text rounded-full py-1 text-xs font-bold font-title shadow-[1px_1px_0px_#32628f] flex items-center justify-center gap-1"
+                                                        className="btn flex-1 bg-white border-2 border-text rounded-full py-1 text-xs font-bold font-title shadow-[1px_1px_0px_#181818] flex items-center justify-center gap-1"
                                                     >
                                                         <i className="fa-solid fa-pen"></i> Edit
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteStaff(st)}
-                                                        className="btn bg-white border-2 border-text rounded-full px-3 py-1 text-xs font-bold font-title text-rose-700 shadow-[1px_1px_0px_#32628f] flex items-center justify-center gap-1"
+                                                        className="btn bg-white border-2 border-text rounded-full px-3 py-1 text-xs font-bold font-title text-rose-700 shadow-[1px_1px_0px_#181818] flex items-center justify-center gap-1"
                                                     >
                                                         <i className="fa-solid fa-trash"></i> Hapus
                                                     </button>
@@ -396,14 +415,14 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                                                             password: ''
                                                                         });
                                                                     }}
-                                                                    className="btn px-2.5 py-1 bg-white border-2 border-text rounded-full hover:bg-yellow-light text-text cursor-pointer shadow-[1.5px_1.5px_0px_#32628f] text-xs font-title"
+                                                                    className="btn px-2.5 py-1 bg-white border-2 border-text rounded-full hover:bg-yellow-light text-text cursor-pointer shadow-[1.5px_1.5px_0px_#181818] text-xs font-title"
                                                                     title="Edit peran & password"
                                                                 >
                                                                     <i className="fa-solid fa-pen"></i>
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleDeleteStaff(st)}
-                                                                    className="btn px-2.5 py-1 bg-white border-2 border-text rounded-full hover:bg-rose-200 text-rose-700 cursor-pointer shadow-[1.5px_1.5px_0px_#32628f] text-xs font-title"
+                                                                    className="btn px-2.5 py-1 bg-white border-2 border-text rounded-full hover:bg-rose-200 text-rose-700 cursor-pointer shadow-[1.5px_1.5px_0px_#181818] text-xs font-title"
                                                                     title="Cabut akses"
                                                                 >
                                                                     <i className="fa-solid fa-trash"></i>
@@ -435,7 +454,7 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                     onClick={() => setAuditFilter(type)}
                                     className={`px-3 py-1 rounded-full text-xs font-title font-bold border-2 border-text cursor-pointer transition-all shrink-0 ${
                                         auditFilter === type 
-                                            ? 'bg-pink text-text shadow-[2px_2px_0px_#32628f]' 
+                                            ? 'bg-pink text-text shadow-[2px_2px_0px_#181818]' 
                                             : 'bg-white text-text hover:bg-yellow-light'
                                     }`}
                                 >
@@ -468,7 +487,7 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                                 {filteredAuditLogs.map((log, index) => (
                                     <div key={log.id || index} className="p-4 hover:bg-yellow-light/20 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs transition-colors font-body">
                                         <div className="flex items-start gap-3 flex-1">
-                                            <span className={`px-2.5 py-1 rounded-full border-2 text-[10px] font-title font-bold shrink-0 uppercase shadow-[1px_1px_0px_#32628f] ${getActionBadgeColor(log.action)}`}>
+                                            <span className={`px-2.5 py-1 rounded-full border-2 text-[10px] font-title font-bold shrink-0 uppercase shadow-[1px_1px_0px_#181818] ${getActionBadgeColor(log.action)}`}>
                                                 {log.action}
                                             </span>
                                             <div>

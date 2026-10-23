@@ -91,9 +91,19 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
 
     return (
         <div className="history-layout lg:h-full h-auto">
-            <div className="history-card bg-white border-[3px] border-text rounded-2xl shadow-card p-6 lg:h-full h-auto relative flex flex-col">
-                <div className="washi-tape tape-history absolute top-[-12px] left-10 transform rotate-[-3deg] h-6 w-24 z-5 border-l border-r border-dashed border-text/25"></div>
-                
+            <div className="history-card bg-white border-[2.5px] border-text rounded-2xl shadow-card overflow-hidden lg:h-full h-auto relative flex flex-col">
+                {/* Retro Window Header */}
+                <div className="retro-window-header">
+                    <div className="retro-dots">
+                        <span className="retro-dot retro-dot-red"></span>
+                        <span className="retro-dot retro-dot-yellow"></span>
+                        <span className="retro-dot retro-dot-blue"></span>
+                        <span className="font-tag text-[9.5px] font-black uppercase tracking-wider text-text ml-1">Riwayat Transaksi</span>
+                    </div>
+                    <span className="text-[10px] font-tag font-bold opacity-75">{transactions.length} Transaksi</span>
+                </div>
+
+                <div className="p-4 sm:p-6 flex flex-col flex-grow">
                 <h3 className="pane-title font-title text-2xl text-text mb-1 title-stroke">
                     <i className="fa-solid fa-clock-rotate-left"></i> Riwayat Transaksi
                 </h3>
@@ -114,7 +124,7 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                             {/* 1. Mobile Card List (< lg) */}
                             <div className="block lg:hidden space-y-3">
                                 {transactions.map(tx => (
-                                    <div key={tx.id} className="bg-yellow-light/20 border-2 border-text rounded-xl p-3.5 shadow-[2px_2px_0px_#32628f] flex flex-col gap-2.5">
+                                    <div key={tx.id} className="bg-yellow-light/20 border-2 border-text rounded-xl p-3.5 shadow-[2px_2px_0px_#181818] flex flex-col gap-2.5">
                                         {/* Card Top: Order ID & Time */}
                                         <div className="flex justify-between items-center border-b border-dashed border-text/20 pb-2">
                                             <span className="font-bold text-xs bg-blue-light border border-text rounded-md px-2 py-0.5 font-mono">{tx.id}</span>
@@ -147,20 +157,20 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                         <div className="flex gap-2 pt-2 border-t border-dashed border-text/20">
                                             <button 
                                                 onClick={() => onReprint(tx)}
-                                                className="btn flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                className="btn flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
                                             >
                                                 <i className="fa-solid fa-print"></i> Struk
                                             </button>
                                             <button 
                                                 onClick={() => handleRefund(tx.id)}
-                                                className="btn flex-1 bg-white text-pink border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                className="btn flex-1 bg-white text-pink border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
                                             >
                                                 <i className="fa-solid fa-rotate-left"></i> Refund
                                             </button>
                                             {isSuperAdmin && (
                                                 <button 
                                                     onClick={() => handleDeleteTransaction(tx)}
-                                                    className="btn bg-rose-500 text-white border-2 border-text rounded-full font-title text-[11px] px-3 py-1.5 shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1"
+                                                    className="btn bg-rose-500 text-white border-2 border-text rounded-full font-title text-[11px] px-3 py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1"
                                                     title="Hapus permanen"
                                                 >
                                                     <i className="fa-solid fa-trash-can"></i>
@@ -205,13 +215,13 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                     <div className="flex gap-2">
                                                         <button 
                                                             onClick={() => onReprint(tx)}
-                                                            className="btn bg-white text-text border-2 border-text rounded-full font-title text-[11px] px-3.5 py-1.5 hover:bg-blue-light cursor-pointer shadow-[2px_2px_0px_#32628f] transition-all flex items-center gap-1"
+                                                            className="btn bg-white text-text border-2 border-text rounded-full font-title text-[11px] px-3.5 py-1.5 hover:bg-blue-light cursor-pointer shadow-[2px_2px_0px_#181818] transition-all flex items-center gap-1"
                                                         >
                                                             <i className="fa-solid fa-print"></i> Struk
                                                         </button>
                                                         <button 
                                                             onClick={() => handleRefund(tx.id)}
-                                                            className="btn bg-white text-pink border-2 border-text rounded-full font-title text-[11px] px-3.5 py-1.5 hover:bg-pink-light cursor-pointer shadow-[2px_2px_0px_#32628f] transition-all flex items-center gap-1"
+                                                            className="btn bg-white text-pink border-2 border-text rounded-full font-title text-[11px] px-3.5 py-1.5 hover:bg-pink-light cursor-pointer shadow-[2px_2px_0px_#181818] transition-all flex items-center gap-1"
                                                             title="Batalkan transaksi & kembalikan stok"
                                                         >
                                                             <i className="fa-solid fa-rotate-left"></i> Refund
@@ -219,7 +229,7 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                         {isSuperAdmin && (
                                                             <button 
                                                                 onClick={() => handleDeleteTransaction(tx)}
-                                                                className="btn bg-red-500 text-white border-2 border-text rounded-full font-title text-[11px] px-3 py-1.5 hover:bg-red-600 cursor-pointer shadow-[2px_2px_0px_#32628f] transition-all flex items-center gap-1"
+                                                                className="btn bg-red-500 text-white border-2 border-text rounded-full font-title text-[11px] px-3 py-1.5 hover:bg-red-600 cursor-pointer shadow-[2px_2px_0px_#181818] transition-all flex items-center gap-1"
                                                                 title="Hapus permanen transaksi (Super Admin)"
                                                             >
                                                                 <i className="fa-solid fa-trash-can"></i> Hapus
@@ -234,6 +244,7 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                             </div>
                         </>
                     )}
+                </div>
                 </div>
             </div>
         </div>

@@ -445,7 +445,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     // Translate category headers
     const getCategoryDisplayLabel = (cat) => {
         const labels = {
-            all: "🌟 Semua",
+            all: "Semua",
             stickers: "Stiker",
             keychains: "Gantungan Kunci",
             prints: "Cetak Gambar",
@@ -457,29 +457,41 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     return (
         <div className="terminal-layout grid grid-cols-1 lg:grid-cols-[1.8fr_1.2fr] gap-5 h-auto pb-10">
             {/* Mobile View Tab Selector */}
-            <div className="lg:hidden flex border-2 border-text rounded-xl overflow-hidden mb-1 shrink-0 bg-white font-title text-xs font-bold shadow-[2px_2px_0px_#32628f] w-full">
+            <div className="lg:hidden flex border-2 border-text rounded-xl overflow-hidden mb-1 shrink-0 bg-white font-tag text-xs font-extrabold uppercase shadow-[2px_2px_0px_#181818] w-full">
                 <button 
                     type="button"
                     onClick={() => setActiveMobileTab('catalog')}
-                    className={`flex-grow py-3 text-center border-r-2 border-text transition-colors cursor-pointer ${
-                        activeMobileTab === 'catalog' ? 'bg-yellow' : 'bg-white hover:bg-yellow-light/50'
+                    className={`flex-grow py-2.5 text-center border-r-2 border-text transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                        activeMobileTab === 'catalog' ? 'bg-yellow text-text' : 'bg-white text-text/70 hover:bg-yellow-light/50'
                     }`}
                 >
-                    🛍️ Katalog Produk
+                    <i className="fa-solid fa-box-open text-xs"></i> Katalog Produk
                 </button>
                 <button 
                     type="button"
                     onClick={() => setActiveMobileTab('cart')}
-                    className={`flex-grow py-3 text-center transition-colors cursor-pointer flex justify-center items-center gap-1.5 ${
-                        activeMobileTab === 'cart' ? 'bg-yellow' : 'bg-white hover:bg-yellow-light/50'
+                    className={`flex-grow py-2.5 text-center transition-colors cursor-pointer flex justify-center items-center gap-1.5 ${
+                        activeMobileTab === 'cart' ? 'bg-yellow text-text' : 'bg-white text-text/70 hover:bg-yellow-light/50'
                     }`}
                 >
-                    🛒 Keranjang ({totals.qty})
+                    <i className="fa-solid fa-cart-shopping text-xs"></i> Keranjang ({totals.qty})
                 </button>
             </div>
             
             {/* Catalog Grid Panel (Left) */}
-            <div className={`catalog-panel flex flex-col h-auto min-h-[400px] bg-white border-[3px] border-text rounded-2xl shadow-card p-4 overflow-visible ${activeMobileTab === 'catalog' ? 'block' : 'hidden lg:flex'}`}>
+            <div className={`catalog-panel flex flex-col h-auto min-h-[400px] bg-white border-[2.5px] border-text rounded-2xl shadow-card overflow-hidden ${activeMobileTab === 'catalog' ? 'block' : 'hidden lg:flex'}`}>
+                {/* Retro Window Header */}
+                <div className="retro-window-header">
+                    <div className="retro-dots">
+                        <span className="retro-dot retro-dot-red"></span>
+                        <span className="retro-dot retro-dot-yellow"></span>
+                        <span className="retro-dot retro-dot-blue"></span>
+                        <span className="font-tag text-[9.5px] font-black uppercase tracking-wider text-text ml-1">Katalog Barang</span>
+                    </div>
+                    <span className="text-[10px] font-tag font-bold opacity-75">{filteredProducts.length} Items</span>
+                </div>
+
+                <div className="p-4 flex flex-col flex-grow">
                 <div className="catalog-controls flex flex-col gap-3 mb-4 shrink-0">
                     <div className="search-box relative flex items-center">
                         <i className="fa-solid fa-magnifying-glass absolute left-3.5 text-text"></i>
@@ -488,7 +500,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder={t.searchPlaceholder}
-                            className="w-full font-body border-[3px] border-text rounded-xl py-2 pl-10 pr-4 text-sm text-text outline-none focus:bg-yellow-light"
+                            className="w-full font-body border-2 border-text rounded-xl py-2 pl-10 pr-4 text-sm text-text outline-none focus:bg-yellow-light/40"
                         />
                     </div>
                     
@@ -497,8 +509,8 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                             <button
                                 key={cat}
                                 onClick={() => setActiveCategory(cat)}
-                                className={`filter-btn font-title text-[12px] font-bold bg-white border-2 border-text rounded-full px-3.5 py-1.5 text-text cursor-pointer transition-all shrink-0 whitespace-nowrap ${
-                                    activeCategory === cat ? 'bg-blue shadow-[2px_2px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'hover:bg-pink-light'
+                                className={`filter-btn font-tag text-[11px] font-extrabold uppercase border-2 border-text rounded-md px-3 py-1 text-text cursor-pointer transition-all shrink-0 whitespace-nowrap shadow-[1.5px_1.5px_0px_#181818] ${
+                                    activeCategory === cat ? 'bg-yellow' : 'bg-white hover:bg-yellow-light'
                                 }`}
                             >
                                 {getCategoryDisplayLabel(cat)}
@@ -528,28 +540,28 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                     <div 
                                         key={product.id}
                                         onClick={(e) => handleAddToTicket(e, product)}
-                                        className={`pos-product-card border-2 border-text rounded-xl p-3.5 flex flex-col justify-between cursor-pointer select-none relative transition-all duration-200 hover:translate-y-[-3px] hover:shadow-[3px_3px_0px_#32628f] hover:bg-white active:translate-y-[1px] active:shadow-[1px_1px_0px_#32628f] ${
-                                            (hasDiscount || hasVarDiscount) ? 'bg-pink-light/40 border-pink' : hasVars ? 'bg-blue-light/35' : 'bg-yellow-light'
+                                        className={`pos-product-card sticker-cutout rounded-xl p-3.5 flex flex-col justify-between cursor-pointer select-none relative transition-all duration-150 hover:bg-white active:translate-y-[1px] ${
+                                            (hasDiscount || hasVarDiscount) ? 'bg-pink-light/50 border-pink' : hasVars ? 'bg-blue-light/40' : 'bg-yellow-light/60'
                                         }`}
                                     >
                                         {(hasDiscount || hasVarDiscount) && (
-                                            <div className="absolute top-1 right-1 bg-pink text-white text-[8.5px] font-bold px-1.5 py-0.2 rounded-full border border-text shadow-[1px_1px_0px_#32628f] z-10 animate-pulse">
-                                                SALE!
+                                            <div className="absolute -top-2 -right-2 bg-pink text-white text-[9px] font-black px-2 py-0.5 rounded-md border-2 border-text shadow-[1.5px_1.5px_0px_#171717] z-10 rotate-6">
+                                                ★ SALE!
                                             </div>
                                         )}
-                                        <div className="flex justify-between items-center gap-1 mb-1 pr-10">
-                                            <span className="text-[9.5px] font-bold opacity-60 font-body truncate">{product.id}</span>
+                                        <div className="flex justify-between items-center gap-1 mb-1 pr-6">
+                                            <span className="text-[10px] font-extrabold opacity-70 font-tag tracking-wider truncate">{product.id}</span>
                                         </div>
-                                        <div className="flex items-center gap-1 mb-1.5 min-h-[18px]">
+                                        <div className="flex items-center gap-1.5 mb-1.5 min-h-[18px]">
                                             {hasVars && (
-                                                <span className="bg-pink-light border border-text rounded-full px-1.5 py-0.2 text-[8px] font-extrabold text-text uppercase shrink-0">
+                                                <span className="bg-yellow border-[1.5px] border-text rounded-md px-1.5 py-0.2 text-[8.5px] font-black text-text uppercase shrink-0 shadow-[1px_1px_0px_#171717]">
                                                     Variasi
                                                 </span>
                                             )}
                                         </div>
                                         <h4 className="card-name font-title text-[13.5px] leading-tight mb-2.5 text-text font-bold line-clamp-2">{product.name}</h4>
-                                        <div className="card-row flex justify-between items-center border-t border-dashed border-text/25 pt-2 mt-auto">
-                                            <span className="card-price font-title text-[13px] font-bold text-text">
+                                        <div className="card-row flex justify-between items-center border-t-2 border-dashed border-text/25 pt-2 mt-auto">
+                                            <span className="card-price font-title text-[13.5px] font-bold text-text">
                                                 {hasDiscount ? (
                                                     <>
                                                         <span className="line-through opacity-50 text-[11px] block">{formatDisplayMoney(product.price)}</span>
@@ -575,63 +587,77 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         </div>
                     )}
                 </div>
+                </div>
             </div>
 
             {/* Ticket Order Panel (Right) */}
-            <div className={`ticket-panel flex flex-col h-auto min-h-[450px] bg-yellow-light border-[3px] border-text rounded-2xl shadow-card p-4 overflow-visible relative ${activeMobileTab === 'cart' ? 'block' : 'hidden lg:flex'}`}>
-                <div className="washi-tape tape-ticket absolute top-[-10px] left-1/2 transform translate-x-[-50%] rotate-[2deg] h-6 w-24 z-5 border-l border-r border-dashed border-text/25"></div>
-                
-                <div className="ticket-header flex justify-between items-center mb-3 pb-2 border-b-2 border-dashed border-text/20 shrink-0">
-                    <h3 className="font-title text-[18px] text-text"><i className="fa-solid fa-receipt"></i> {t.activeOrder}</h3>
+            <div className={`ticket-panel flex flex-col h-auto min-h-[450px] bg-white border-[3px] border-text rounded-2xl shadow-pop overflow-hidden ${activeMobileTab === 'cart' ? 'block' : 'hidden lg:flex'}`}>
+                {/* Retro Window Header for Ticket */}
+                <div className="retro-window-header bg-yellow border-b-[2.5px] border-text px-3.5 py-2 flex items-center justify-between">
+                    <div className="retro-dots flex items-center gap-1.5">
+                        <span className="retro-dot retro-dot-red"></span>
+                        <span className="retro-dot retro-dot-yellow"></span>
+                        <span className="retro-dot retro-dot-blue"></span>
+                        <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Pesanan Aktif</span>
+                    </div>
+                    <span className="text-[10px] font-tag font-black uppercase bg-white border border-text px-2 py-0.5 rounded shadow-[1px_1px_0px_#171717]">{ticket.length} Macam</span>
+                </div>
+
+                <div className="p-4 flex flex-col flex-grow bg-[#FFFDF9]">
+                <div className="ticket-header flex justify-between items-center mb-3 pb-2 border-b-2 border-dashed border-text/25 shrink-0">
+                    <h3 className="font-title text-[17px] text-text flex items-center gap-2">
+                        <span className="bg-pink text-white text-xs px-2 py-0.5 rounded-md border border-text shadow-[1px_1px_0px_#171717]">★</span>
+                        <span>{t.activeOrder}</span>
+                    </h3>
                     <button 
                         onClick={handleClearTicket}
-                        className="btn-clear-ticket bg-none border-none text-text font-title text-[11px] font-bold cursor-pointer flex items-center gap-1 hover:text-pink hover:scale-105"
+                        className="btn-clear-ticket bg-white border-[1.5px] border-text rounded-md px-2 py-1 text-text font-tag text-[10px] font-black uppercase cursor-pointer flex items-center gap-1 hover:bg-pink hover:text-white transition-all shadow-[1px_1px_0px_#171717]"
                     >
                         <i className="fa-solid fa-trash-can"></i> {t.clear}
                     </button>
                 </div>
                 
-                <div className="ticket-items-container flex-grow overflow-y-auto max-h-[250px] lg:max-h-[350px] mb-4">
+                <div className="ticket-items-container flex-grow overflow-y-auto max-h-[250px] lg:max-h-[350px] mb-4 pr-1">
                     {ticket.length === 0 ? (
-                        <div className="ticket-empty flex flex-col items-center justify-center text-center h-full text-text/50 gap-2">
-                            <i className="fa-solid fa-basket-shopping text-4xl"></i>
-                            <p className="text-xs font-bold">{t.emptyTicket}</p>
+                        <div className="ticket-empty flex flex-col items-center justify-center text-center h-full text-text/50 gap-2.5 py-8 border-2 border-dashed border-text/15 rounded-xl bg-yellow-light/20">
+                            <i className="fa-solid fa-basket-shopping text-4xl text-text/40"></i>
+                            <p className="text-xs font-tag font-bold tracking-wide">{t.emptyTicket}</p>
                         </div>
                     ) : (
                         <div className="ticket-items-list flex flex-col gap-2.5">
                             {ticket.map(item => (
-                                <div key={item.instanceId || `${item.id}-${item.variationName || 'base'}`} className={`ticket-item-row flex items-center bg-white border-2 rounded-lg p-2.5 gap-2.5 shadow-[2px_2px_0px_#32628f] ${item.discount > 0 ? 'border-pink' : 'border-text'}`}>
+                                <div key={item.instanceId || `${item.id}-${item.variationName || 'base'}`} className={`ticket-item-row flex items-center bg-white border-2 rounded-xl p-2.5 gap-2.5 shadow-[2px_2px_0px_#171717] transition-all hover:translate-x-0.5 ${item.discount > 0 ? 'border-pink bg-pink-light/20' : 'border-text'}`}>
                                     <div className="flex flex-col flex-grow min-w-0">
                                         <span className={`t-item-name font-title text-[12px] truncate ${item.isBundle ? 'text-pink font-bold' : 'text-text'}`} title={item.name}>
                                             {item.name}
                                         </span>
                                         {item.discount > 0 && (
-                                            <span className="text-[9px] text-pink font-bold">-{formatDisplayMoney(item.discount)}/pcs</span>
+                                            <span className="text-[9px] text-pink font-extrabold font-tag">-{formatDisplayMoney(item.discount)}/pcs</span>
                                         )}
                                     </div>
-                                    <div className={`t-qty-control flex items-center border-[1.5px] border-text rounded-full overflow-hidden h-6 bg-white shrink-0 ${item.isBundle ? 'opacity-50' : ''}`}>
+                                    <div className={`t-qty-control flex items-center border-2 border-text rounded-full overflow-hidden h-6.5 bg-white shrink-0 shadow-[1px_1px_0px_#171717] ${item.isBundle ? 'opacity-50' : ''}`}>
                                         <button 
                                             onClick={() => handleUpdateQty(item.id, item.variationName, -1)}
                                             disabled={item.isBundle}
-                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-bold text-text hover:bg-blue-light disabled:cursor-not-allowed"
+                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-black text-text hover:bg-yellow disabled:cursor-not-allowed"
                                         >
                                             -
                                         </button>
-                                        <span className="t-qty-num px-1 text-[11px] font-bold min-w-4 text-center text-text">{item.qty}</span>
+                                        <span className="t-qty-num px-1.5 text-[11px] font-black min-w-4 text-center text-text">{item.qty}</span>
                                         <button 
                                             onClick={() => handleUpdateQty(item.id, item.variationName, 1)}
                                             disabled={item.isBundle}
-                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-bold text-text hover:bg-blue-light disabled:cursor-not-allowed"
+                                            className="t-qty-btn bg-none border-none w-5 h-full cursor-pointer text-[10px] font-black text-text hover:bg-yellow disabled:cursor-not-allowed"
                                         >
                                             +
                                         </button>
                                     </div>
-                                    <span className="t-item-price text-[12px] font-bold min-w-[55px] text-right text-text">
+                                    <span className="t-item-price text-[12px] font-title font-bold min-w-[55px] text-right text-text">
                                         {formatDisplayMoney(item.price * item.qty)}
                                     </span>
                                     <button 
                                         onClick={() => handleRemoveItem(item.id, item.variationName)}
-                                        className="t-item-remove bg-none border-none text-pink cursor-pointer text-xs p-0.5 hover:scale-115 shrink-0"
+                                        className="t-item-remove bg-none border-none text-text/50 hover:text-pink cursor-pointer text-xs p-1 hover:scale-115 shrink-0"
                                     >
                                         <i className="fa-solid fa-xmark"></i>
                                     </button>
@@ -672,8 +698,8 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
                     {/* Payment methods: Cash / QRIS only */}
                     <div className="payment-section mb-3 text-text">
-                        <span className="section-label font-title text-[11px] font-bold block mb-1.5">{t.paymentMethod}</span>
-                        <div className="payment-options grid grid-cols-2 gap-4">
+                        <span className="section-label font-tag text-[10.5px] font-black uppercase tracking-wider block mb-1.5">{t.paymentMethod}</span>
+                        <div className="payment-options grid grid-cols-2 gap-3">
                             {['cash', 'qris'].map(method => (
                                 <label key={method} className="payment-opt cursor-pointer">
                                     <input 
@@ -684,12 +710,12 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                         onChange={() => setPaymentMethod(method)}
                                         className="hidden" 
                                     />
-                                    <div className={`payment-card border-2 border-text rounded-lg p-2 text-center bg-white font-title text-[12px] font-bold shadow-[2px_2px_0px_#32628f] flex flex-col items-center gap-1.5 transition-all ${
-                                        paymentMethod === method ? 'bg-yellow translate-y-[1px] translate-x-[1px] shadow-[1px_1px_0px_#32628f]' : ''
+                                    <div className={`payment-card border-2 border-text rounded-xl p-2.5 text-center bg-white font-tag text-[11px] font-black uppercase shadow-[2px_2px_0px_#171717] flex flex-col items-center gap-1.5 transition-all ${
+                                        paymentMethod === method ? 'bg-yellow shadow-[1px_1px_0px_#171717] translate-y-0.5' : 'hover:bg-yellow-light/50'
                                     }`}>
                                         <i className={`fa-solid ${
                                             method === 'cash' ? 'fa-money-bill-wave' : 'fa-qrcode'
-                                        } text-lg`}></i>
+                                        } text-base`}></i>
                                         <span>{method === 'cash' ? t.cash : t.qris}</span>
                                     </div>
                                 </label>
@@ -699,16 +725,17 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
                     <button 
                         onClick={handleCheckoutPress}
-                        className="btn btn-primary btn-block bg-pink text-text border-[3px] border-text rounded-full font-title text-[14px] px-6 py-2.5 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] active:translate-y-[1px] active:shadow-[2px_2px_0px_#32628f] transition-all cursor-pointer flex items-center justify-center gap-2 bounce-hover w-full"
+                        className="btn btn-primary btn-block bg-pink text-text border-[2.5px] border-text rounded-xl font-tag text-[13px] font-black uppercase tracking-wider px-6 py-3 shadow-[3px_3px_0px_#171717] hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#171717] active:translate-y-[1px] active:shadow-[1px_1px_0px_#171717] transition-all cursor-pointer flex items-center justify-center gap-2 w-full"
                     >
                         <span>{t.process} 🛒</span>
                     </button>
+                </div>
                 </div>
             </div>
 
             {/* Variation Selection Bubble Modal */}
             {variationProduct && (
-                <div className="fixed inset-0 bg-[#32628F]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4">
+                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4">
                     <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[340px] overflow-hidden flex flex-col p-5 text-text relative">
                         <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
                         
@@ -739,8 +766,8 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                             isOut 
                                                 ? 'bg-text/5 opacity-55 cursor-not-allowed border-text/30' 
                                                 : vHasDiscount
-                                                    ? 'bg-pink-light/30 border-pink hover:bg-pink-light cursor-pointer shadow-[2px_2px_0px_#32628f] hover:translate-y-[-2px] active:translate-y-[0px] active:shadow-[1px_1px_0px_#32628f]'
-                                                    : 'bg-yellow-light hover:bg-yellow cursor-pointer shadow-[2px_2px_0px_#32628f] hover:translate-y-[-2px] active:translate-y-[0px] active:shadow-[1px_1px_0px_#32628f]'
+                                                    ? 'bg-pink-light/30 border-pink hover:bg-pink-light cursor-pointer shadow-[2px_2px_0px_#181818] hover:translate-y-[-2px] active:translate-y-[0px] active:shadow-[1px_1px_0px_#181818]'
+                                                    : 'bg-yellow-light hover:bg-yellow cursor-pointer shadow-[2px_2px_0px_#181818] hover:translate-y-[-2px] active:translate-y-[0px] active:shadow-[1px_1px_0px_#181818]'
                                         }`}
                                     >
                                         <div className="flex flex-col items-start">
@@ -768,7 +795,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
             {/* Interactive QRIS Scan Overlay Modal */}
             {showQrisModal && (
-                <div className="fixed inset-0 bg-[#32628F]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4">
+                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4">
                     <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[340px] overflow-hidden flex flex-col items-center p-5 text-text relative">
                         <div className="washi-tape tape-ticket absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24"></div>
                         
@@ -783,7 +810,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         </div>
                         
                         {/* QRIS Code Graphic */}
-                        <div className="border-[3px] border-text p-1.5 rounded-xl bg-white mb-4 relative shadow-[4px_4px_0px_#32628f] w-[200px] h-[200px] flex items-center justify-center overflow-hidden">
+                        <div className="border-[3px] border-text p-1.5 rounded-xl bg-white mb-4 relative shadow-[4px_4px_0px_#181818] w-[200px] h-[200px] flex items-center justify-center overflow-hidden">
                             <img src="/qris.png" alt="QRIS Code" className="w-full h-full object-contain" />
                         </div>
 
@@ -798,7 +825,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
                         <button 
                             onClick={completeCheckout}
-                            className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[13px] px-6 py-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#32628f] transition-all w-full cursor-pointer"
+                            className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[13px] px-6 py-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#181818] transition-all w-full cursor-pointer"
                         >
                             Lunas
                         </button>
