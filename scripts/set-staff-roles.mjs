@@ -13,25 +13,37 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync, existsSync } from 'fs';
 
-// Designated 6 Kanvahati Team Accounts with Assigned Roles
+// Designated Kanvahati Team Accounts with Assigned Roles
 export const DESIGNATED_STAFF = [
     {
-        email: "owner@kanvahati.internal",
-        displayName: "Kanvahati Lead / Owner",
+        email: "neptuniistars@gmail.com",
+        displayName: "Tenma",
+        role: "super_admin",
+        notes: "Super Admin: full system, user management, audit logs, delete transactions"
+    },
+    {
+        email: "ansellmatita@gmail.com",
+        displayName: "Sil",
+        role: "super_admin",
+        notes: "Super Admin: full system, user management, audit logs, delete transactions"
+    },
+    {
+        email: "jun@kanvahati.internal",
+        displayName: "Jun",
         role: "admin",
-        notes: "Full access to POS, Inventory, Finance, and Arcade Management"
+        notes: "Admin Kasir: POS, stock, promo, bundles, rekapan"
     },
     {
-        email: "kasir1@kanvahati.internal",
-        displayName: "Kasir Peach 🌸",
-        role: "cashier",
-        notes: "POS Terminal & Cash Drawer access"
+        email: "shu@kanvahati.internal",
+        displayName: "Shu",
+        role: "admin",
+        notes: "Admin Kasir: POS, stock, promo, bundles, rekapan"
     },
     {
-        email: "kasir2@kanvahati.internal",
-        displayName: "Kasir Mint 🍃",
-        role: "cashier",
-        notes: "POS Terminal & Cash Drawer access"
+        email: "rara@kanvahati.internal",
+        displayName: "Rara",
+        role: "admin",
+        notes: "Admin Kasir: POS, stock, promo, bundles, rekapan"
     },
     {
         email: "host1@kanvahati.internal",

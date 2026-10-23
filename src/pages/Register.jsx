@@ -492,12 +492,12 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         />
                     </div>
                     
-                    <div className="category-filters flex flex-wrap gap-2">
+                    <div className="category-filters flex flex-nowrap overflow-x-auto pb-1.5 gap-2 scrollbar-none -mx-1 px-1">
                         {['all', ...categories].map(cat => (
                             <button
                                 key={cat}
                                 onClick={() => setActiveCategory(cat)}
-                                className={`filter-btn font-title text-[12px] font-bold bg-white border-2 border-text rounded-full px-3.5 py-1.5 text-text cursor-pointer transition-all ${
+                                className={`filter-btn font-title text-[12px] font-bold bg-white border-2 border-text rounded-full px-3.5 py-1.5 text-text cursor-pointer transition-all shrink-0 whitespace-nowrap ${
                                     activeCategory === cat ? 'bg-blue shadow-[2px_2px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'hover:bg-pink-light'
                                 }`}
                             >
@@ -533,14 +533,16 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                         }`}
                                     >
                                         {(hasDiscount || hasVarDiscount) && (
-                                            <div className="absolute -top-2 -right-2 bg-pink text-white text-[9px] font-bold px-2 py-0.5 rounded-full border-2 border-text shadow-[1px_1px_0px_#32628f] z-10 animate-pulse">
+                                            <div className="absolute top-1 right-1 bg-pink text-white text-[8.5px] font-bold px-1.5 py-0.2 rounded-full border border-text shadow-[1px_1px_0px_#32628f] z-10 animate-pulse">
                                                 SALE!
                                             </div>
                                         )}
-                                        <div className="flex justify-between items-start gap-2 mb-1.5">
-                                            <span className="text-[10px] font-bold opacity-60 font-body truncate">{product.id}</span>
+                                        <div className="flex justify-between items-center gap-1 mb-1 pr-10">
+                                            <span className="text-[9.5px] font-bold opacity-60 font-body truncate">{product.id}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 mb-1.5 min-h-[18px]">
                                             {hasVars && (
-                                                <span className="bg-pink-light border border-text rounded-full px-1.5 py-0.2 text-[8.5px] font-extrabold text-text uppercase shrink-0">
+                                                <span className="bg-pink-light border border-text rounded-full px-1.5 py-0.2 text-[8px] font-extrabold text-text uppercase shrink-0">
                                                     Variasi
                                                 </span>
                                             )}

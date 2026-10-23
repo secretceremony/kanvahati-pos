@@ -28,7 +28,7 @@ export const t = {
     receipt: "Struk",
     reprint: "Struk",
     date: "Tanggal",
-    cashier: "Kasir",
+    cashier: "User",
     subtotal: "Subtotal",
     grandTotal: "Total Akhir",
     method: "Metode",

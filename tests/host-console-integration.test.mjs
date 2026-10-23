@@ -20,9 +20,10 @@ test('Host Console End-to-End Integration Test Suite', async (t) => {
 
     await t.test('1. Role-Based Access Control untuk Host Console', () => {
         function checkHostAccess(role) {
-            return role === 'admin' || role === 'arcade_host';
+            return role === 'admin' || role === 'super_admin' || role === 'arcade_host';
         }
-
+        
+        assert.equal(checkHostAccess('super_admin'), true, 'Super Admin harus diizinkan mengakses Host Console');
         assert.equal(checkHostAccess('admin'), true, 'Admin harus diizinkan');
         assert.equal(checkHostAccess('arcade_host'), true, 'Arcade Host harus diizinkan');
         assert.equal(checkHostAccess('cashier'), false, 'Kasir biasa tidak boleh mengakses Host Console');

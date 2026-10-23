@@ -471,10 +471,10 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier, app
         subtotal: totals.subtotal,
         total: totals.total,
         paymentMethod: paymentMethod,
-        cashier: cashier || "Kasir Peach 🌸"
+        cashier: (cashier || "Staf").replace(/^Kasir\s+/i, '')
     };
 
-    // Update in-memory product stock cache directly!
+// 4. Update in-memory product stock cache directly!
     if (cacheProducts) {
         items.forEach(item => {
             const prod = cacheProducts.find(p => p.id === item.id);
@@ -482,11 +482,11 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier, app
                 if (item.variationName && prod.variations && prod.variations.length > 0) {
                     const variation = prod.variations.find(v => v.name === item.variationName);
                     if (variation) {
-                        variation.stock = Math.max(0, variation.stock - item.qty);
+                        variation.stock = Math.max(0, (variation.stock || 0) - item.qty);
                     }
-                    prod.stock = prod.variations.reduce((sum, v) => sum + v.stock, 0);
+                    prod.stock = prod.variations.reduce((sum, v) => sum + (v.stock || 0), 0);
                 } else {
-                    prod.stock = Math.max(0, prod.stock - item.qty);
+                    prod.stock = Math.max(0, (prod.stock || 0) - item.qty);
                 }
             }
         });
@@ -834,7 +834,7 @@ export const addCashDrawerEntry = async (type, amount, note, cashier) => {
         type, // 'starting_cash' | 'cash_in' | 'cash_out'
         amount: parseFloat(amount || 0),
         note: note ? note.trim() : "",
-        cashier: cashier || "Kasir Peach 🌸"
+        cashier: (cashier || "Staf").replace(/^Kasir\s+/i, '')
     };
 
     if (cacheCashDrawer) {

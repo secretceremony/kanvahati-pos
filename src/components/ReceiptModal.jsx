@@ -23,7 +23,7 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
             <div style="font-size: 12px; line-height: 1.5;">
                 <div><strong>ID Pesanan:</strong> ${transaction.id}</div>
                 <div><strong>Tanggal:</strong> ${formattedDate}</div>
-                <div><strong>Kasir:</strong> ${transaction.cashier || "Kasir Peach 🌸"}</div>
+                <div><strong>User:</strong> ${(transaction.cashier || "Staf").replace(/^Kasir\s+/i, '')}</div>
             </div>
             <hr style="border: none; border-top: 1.5px dashed #000; margin: 12px 0;" />
             <div style="font-size: 12px; line-height: 1.6;">
@@ -150,7 +150,7 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                     <div className="receipt-meta text-[11px] flex flex-col gap-1">
                         <div><strong>{t.orderId}:</strong> {transaction.id}</div>
                         <div><strong>{t.date}:</strong> {formattedDate}</div>
-                        <div><strong>{t.cashier}:</strong> {transaction.cashier || "Kasir Peach 🌸"}</div>
+                        <div><strong>{t.cashier || "User"}:</strong> {(transaction.cashier || "Staf").replace(/^Kasir\s+/i, '')}</div>
                     </div>
 
                     <div className="receipt-divider border-t-2 border-dashed border-text my-2.5"></div>

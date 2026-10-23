@@ -10,9 +10,10 @@ import {
     deleteProductsBulk,
     updateCategoryName
 } from '../services/db';
+import { recordAuditLog } from '../services/audit';
 import { t } from '../services/translations';
 
-export default function Inventory({ showToast }) {
+export default function Inventory({ showToast, currentUser, userRole }) {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -266,6 +267,25 @@ export default function Inventory({ showToast }) {
 
         try {
             await saveProduct(newProd);
+            await recordAuditLog({
+                action: 'ITEM_ADD',
+                summary: `Produk "${newProd.name}" (${newProd.id}) ditambahkan dengan harga ${formatPrice(newProd.price)} & stok ${newProd.stock}`,
+                actor: {
+                    uid: currentUser?.uid,
+                    email: currentUser?.email,
+                    displayName: currentUser?.displayName || 'Staf',
+                    role: userRole
+                },
+                details: {
+                    productId: newProd.id,
+                    name: newProd.name,
+                    price: newProd.price,
+                    stock: newProd.stock,
+                    category: newProd.category,
+                    variations: newProd.variations
+                }
+            });
+
             showToast(t.addSuccess || "Produk ditambahkan!", "🎉");
             
             // Reset form
@@ -324,7 +344,19 @@ export default function Inventory({ showToast }) {
     const handleDelete = async (productId) => {
         if (window.confirm("Apakah Anda yakin ingin menghapus produk ini?")) {
             try {
+                const prod = products.find(p => p.id === productId);
                 await deleteProduct(productId);
+                await recordAuditLog({
+                    action: 'ITEM_DELETE',
+                    summary: `Produk "${prod?.name || productId}" dihapus dari katalog`,
+                    actor: {
+                        uid: currentUser?.uid,
+                        email: currentUser?.email,
+                        displayName: currentUser?.displayName || 'Staf',
+                        role: userRole
+                    },
+                    details: { productId, deletedProduct: prod }
+                });
                 showToast(t.deleteSuccess || "Produk dihapus!", "🗑️");
                 // Clear from selection if deleted
                 setSelectedProducts(prev => prev.filter(id => id !== productId));
@@ -444,7 +476,72 @@ export default function Inventory({ showToast }) {
         };
 
         try {
+            const oldProduct = products.find(p => p.id === updatedProd.id);
+            const isPriceChanged = oldProduct && (
+                oldProduct.price !== updatedProd.price || 
+                JSON.stringify(oldProduct.variations?.map(v => ({ n: v.name, p: v.price }))) !== 
+                JSON.stringify(updatedProd.variations?.map(v => ({ n: v.name, p: v.price })))
+            );
+            const isDiscountChanged = oldProduct && (
+                (oldProduct.discount || 0) !== (updatedProd.discount || 0) ||
+                JSON.stringify(oldProduct.variations?.map(v => ({ n: v.name, d: v.discount }))) !== 
+                JSON.stringify(updatedProd.variations?.map(v => ({ n: v.name, d: v.discount })))
+            );
+
             await saveProduct(updatedProd);
+
+            if (isPriceChanged) {
+                await recordAuditLog({
+                    action: 'PRICE_CHANGE',
+                    summary: `Harga produk "${updatedProd.name}" diubah dari ${formatPrice(oldProduct.price)} menjadi ${formatPrice(updatedProd.price)}`,
+                    actor: {
+                        uid: currentUser?.uid,
+                        email: currentUser?.email,
+                        displayName: currentUser?.displayName || 'Staf',
+                        role: userRole
+                    },
+                    details: {
+                        productId: updatedProd.id,
+                        oldPrice: oldProduct.price,
+                        newPrice: updatedProd.price,
+                        oldVariations: oldProduct.variations,
+                        newVariations: updatedProd.variations
+                    }
+                });
+            }
+
+            if (isDiscountChanged) {
+                await recordAuditLog({
+                    action: 'DISCOUNT_CHANGE',
+                    summary: `Diskon produk "${updatedProd.name}" diubah dari Rp ${oldProduct.discount || 0} menjadi Rp ${updatedProd.discount || 0}`,
+                    actor: {
+                        uid: currentUser?.uid,
+                        email: currentUser?.email,
+                        displayName: currentUser?.displayName || 'Staf',
+                        role: userRole
+                    },
+                    details: {
+                        productId: updatedProd.id,
+                        oldDiscount: oldProduct.discount,
+                        newDiscount: updatedProd.discount
+                    }
+                });
+            }
+
+            if (!isPriceChanged && !isDiscountChanged) {
+                await recordAuditLog({
+                    action: 'ITEM_UPDATE',
+                    summary: `Data produk "${updatedProd.name}" diperbarui`,
+                    actor: {
+                        uid: currentUser?.uid,
+                        email: currentUser?.email,
+                        displayName: currentUser?.displayName || 'Staf',
+                        role: userRole
+                    },
+                    details: { productId: updatedProd.id, updatedFields: updatedProd }
+                });
+            }
+
             showToast("Produk berhasil diperbarui!", "🌸");
             setEditingProduct(null);
             fetchProducts(); // Refresh table view
@@ -785,11 +882,126 @@ export default function Inventory({ showToast }) {
                     </div>
                 )}
 
-                <div className="table-container flex-grow overflow-y-auto overflow-x-auto max-h-[600px] border-2 border-text rounded-lg">
+                <div className="table-container flex-grow overflow-y-auto max-h-[600px]">
                     {loading ? (
                         <div className="text-center py-12 font-bold text-text/60">{t.loadingProducts}</div>
                     ) : (
-                        <table className="history-table w-full border-collapse text-left text-[13px] text-text">
+                        <>
+                            {/* 1. Mobile Card List (< lg) */}
+                            <div className="block lg:hidden space-y-3">
+                                {products.map(prod => {
+                                    const isLowStock = prod.stock < 10;
+                                    const hasVars = prod.variations && prod.variations.length > 0;
+                                    const isExpanded = expandedProductId === prod.id;
+
+                                    return (
+                                        <div key={prod.id} className={`border-2 border-text rounded-xl p-3.5 shadow-[2px_2px_0px_#32628f] flex flex-col gap-2 ${
+                                            isLowStock ? 'bg-pink-light/30' : 'bg-yellow-light/20'
+                                        }`}>
+                                            <div className="flex justify-between items-start gap-2 border-b border-dashed border-text/20 pb-2">
+                                                <div className="flex items-start gap-2">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={selectedProducts.includes(prod.id)} 
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedProducts(prev => [...prev, prod.id]);
+                                                            } else {
+                                                                setSelectedProducts(prev => prev.filter(id => id !== prod.id));
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 cursor-pointer accent-pink mt-0.5"
+                                                    />
+                                                    <div>
+                                                        <span className="font-mono text-[10px] font-bold opacity-60 block">{prod.id}</span>
+                                                        <h4 className="font-title font-bold text-sm text-text leading-tight mt-0.5">{prod.name}</h4>
+                                                    </div>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded-full font-title text-[10px] font-bold border border-text shrink-0 ${
+                                                    isLowStock ? 'bg-rose-200 text-rose-800' : 'bg-green-100 text-green-800'
+                                                }`}>
+                                                    Stok: {prod.stock}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-xs">
+                                                <div>
+                                                    <span className="text-[10px] opacity-60 uppercase block font-bold">Harga</span>
+                                                    <span className="font-title font-bold text-sm text-pink">
+                                                        {formatPrice(hasVars ? Math.min(...prod.variations.map(v => v.price)) : prod.price)}
+                                                        {hasVars && <span className="text-[9px] block font-body opacity-70 font-normal">(Mulai dari)</span>}
+                                                    </span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-[10px] opacity-60 uppercase block font-bold">Kategori</span>
+                                                    <span className="font-bold text-xs">{getCategoryDisplayLabel(prod.category)}</span>
+                                                </div>
+                                            </div>
+
+                                            {hasVars && (
+                                                <div className="bg-white/80 border border-text rounded-lg p-2.5 mt-1">
+                                                    <div 
+                                                        onClick={() => setExpandedProductId(isExpanded ? null : prod.id)}
+                                                        className="flex justify-between items-center cursor-pointer text-xs font-title font-bold text-blue"
+                                                    >
+                                                        <span>{prod.variations.length} Variasi Tersedia</span>
+                                                        <i className={`fa-solid fa-chevron-down transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
+                                                    </div>
+                                                    {isExpanded && (
+                                                        <div className="divide-y divide-text/10 mt-2 pt-1">
+                                                            {prod.variations.map((v, i) => (
+                                                                <div key={i} className="py-2 flex justify-between items-center text-[11.5px]">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-bold">{v.name}</span>
+                                                                        <span className="font-mono text-pink">{formatPrice(v.price)}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="bg-yellow-light border border-text rounded px-2 py-0.5 font-mono text-[10px] font-bold">{v.stock} pcs</span>
+                                                                        <button 
+                                                                            onClick={() => handleRestockClick(prod, v.name)}
+                                                                            className="btn bg-blue-light text-text border border-text rounded px-2 py-0.5 text-[10px] font-bold shadow-[1px_1px_0px_#32628f] active:translate-y-[1px]"
+                                                                            title="Tambah stok"
+                                                                        >
+                                                                            +Stok
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div className="flex gap-2 pt-2 border-t border-dashed border-text/20">
+                                                {!hasVars && (
+                                                    <button 
+                                                        onClick={() => handleRestockClick(prod)}
+                                                        className="btn flex-1 bg-blue-light text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                    >
+                                                        <i className="fa-solid fa-box-open"></i> +Stok
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => handleOpenEditModal(prod)}
+                                                    className="btn flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                >
+                                                    <i className="fa-solid fa-pen"></i> Edit
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDelete(prod.id)}
+                                                    className="btn bg-white text-rose-700 border-2 border-text rounded-full px-3 py-1 font-title text-[11px] shadow-[1.5px_1.5px_0px_#32628f] active:translate-y-[1px] flex items-center justify-center gap-1"
+                                                >
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* 2. Desktop Table (>= lg) */}
+                            <div className="hidden lg:block border-2 border-text rounded-lg overflow-x-auto">
+                                <table className="history-table w-full border-collapse text-left text-[13px] text-text">
                             <thead>
                                 <tr className="bg-blue-light border-b-2 border-text font-title font-bold">
                                     <th className="p-3 w-10 text-center">
@@ -841,6 +1053,11 @@ export default function Inventory({ showToast }) {
                                                 </td>
                                                 <td className="p-3 font-bold text-[11px]">
                                                     {prod.id}
+                                                    {prod.tag && (
+                                                        <span className="block text-[9px] font-normal opacity-70">
+                                                            Tag: {prod.tag}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="p-3 font-bold flex flex-col gap-0.5">
                                                     <span>{prod.name}</span>
@@ -962,6 +1179,8 @@ export default function Inventory({ showToast }) {
                                 })}
                             </tbody>
                         </table>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

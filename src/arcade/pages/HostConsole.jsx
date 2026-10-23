@@ -65,8 +65,8 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
     // Timer interval reference
     const timerIntervalRef = useRef(null);
 
-    // Check Role-Based Access: Must be admin or arcade_host
-    const hasHostAccess = userRole === 'admin' || userRole === 'arcade_host';
+    // Check Role-Based Access: Must be super_admin, admin, or arcade_host
+    const hasHostAccess = userRole === 'admin' || userRole === 'super_admin' || userRole === 'arcade_host';
 
     // Subscribe to played participants for current event
     useEffect(() => {

@@ -6,7 +6,7 @@ import { getAuth } from "firebase/auth";
 // Read environment config (supports Vite import.meta.env and Node process.env for tests)
 const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' ? process.env : {});
 
-const firebaseConfig = {
+export const firebaseConfig = {
     apiKey: env.VITE_FIREBASE_API_KEY || "mock-api-key",
     authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "mock-auth-domain.firebaseapp.com",
     projectId: env.VITE_FIREBASE_PROJECT_ID || "mock-project-id",

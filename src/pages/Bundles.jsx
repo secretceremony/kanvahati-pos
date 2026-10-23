@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getBundles, saveBundle, deleteBundle, getProducts } from '../services/db';
+import { recordAuditLog } from '../services/audit';
 import { t } from '../services/translations';
 
-export default function Bundles() {
+export default function Bundles({ showToast, currentUser, userRole }) {
     const [bundles, setBundles] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -124,14 +125,51 @@ export default function Bundles() {
             createdAt: editingBundle ? editingBundle.createdAt : new Date().toISOString()
         };
 
+        const isNew = !editingBundle;
+        const oldBundle = editingBundle;
         await saveBundle(bundleToSave);
+
+        await recordAuditLog({
+            action: isNew ? 'DISCOUNT_CHANGE' : 'DISCOUNT_CHANGE',
+            summary: isNew 
+                ? `Bundle/Promo baru "${bundleToSave.name}" dibuat dengan harga ${formatMoney(bundleToSave.bundlePrice)}`
+                : `Bundle/Promo "${bundleToSave.name}" diubah: harga ${oldBundle ? formatMoney(oldBundle.bundlePrice) : '-'} -> ${formatMoney(bundleToSave.bundlePrice)}, status: ${bundleToSave.isActive ? 'Aktif' : 'Nonaktif'}`,
+            actor: {
+                uid: currentUser?.uid,
+                email: currentUser?.email,
+                displayName: currentUser?.displayName || 'Staf',
+                role: userRole
+            },
+            details: {
+                bundleId: bundleToSave.id,
+                name: bundleToSave.name,
+                bundlePrice: bundleToSave.bundlePrice,
+                isActive: bundleToSave.isActive,
+                items: bundleToSave.items
+            }
+        });
+
+        if (showToast) showToast(isNew ? "Bundle promo berhasil dibuat!" : "Bundle promo diperbarui!", "🏷️");
         handleCloseModal();
         loadData();
     };
 
     const handleDelete = async (id) => {
         if (window.confirm("Apakah Anda yakin ingin menghapus bundle ini?")) {
+            const bundleToDelete = bundles.find(b => b.id === id);
             await deleteBundle(id);
+            await recordAuditLog({
+                action: 'DISCOUNT_CHANGE',
+                summary: `Bundle/Promo "${bundleToDelete?.name || id}" dihapus`,
+                actor: {
+                    uid: currentUser?.uid,
+                    email: currentUser?.email,
+                    displayName: currentUser?.displayName || 'Staf',
+                    role: userRole
+                },
+                details: { bundleId: id, deletedBundle: bundleToDelete }
+            });
+            if (showToast) showToast("Bundle promo dihapus!", "🗑️");
             loadData();
         }
     };

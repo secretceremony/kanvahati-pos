@@ -45,7 +45,7 @@ export default function QuestionBankManager({ currentUser, userRole, showToast }
         songTitle: ''
     });
 
-    const isAdminOrHost = userRole === 'admin' || userRole === 'arcade_host';
+    const isAdminOrHost = userRole === 'admin' || userRole === 'super_admin' || userRole === 'arcade_host';
 
     // Load questions and secrets
     const loadData = async () => {

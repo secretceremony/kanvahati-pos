@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { getTransactionsList } from '../services/db';
+import { db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { recordAuditLog } from '../services/audit';
 
-export default function CashDrawer({ showToast, activeCashier, onCashierChange }) {
+export default function CashDrawer({ showToast, activeCashier, onCashierChange, currentUser, userRole }) {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeMobileTab, setActiveMobileTab] = useState('summary');
 
     // Parse active cashier name (removing the prefix "Kasir ")
     const parseCashierInfo = () => {
-        return activeCashier.replace(/^Kasir\s+/, '').trim();
+        return activeCashier.replace(/^Kasir\s+/i, '').trim();
     };
 
     const [cashierNameInput, setCashierNameInput] = useState(parseCashierInfo());
@@ -67,18 +70,49 @@ export default function CashDrawer({ showToast, activeCashier, onCashierChange }
 
     const summary = getTodaySalesSummary();
 
-    const handleSaveShiftSettings = (e) => {
+    const handleSaveShiftSettings = async (e) => {
         e.preventDefault();
-        const cleanName = cashierNameInput.trim();
+        const cleanName = cashierNameInput.trim().replace(/^Kasir\s+/i, '');
 
         if (!cleanName) {
-            showToast("Nama kasir tidak boleh kosong!", "⚠️");
+            showToast("Nama user tidak boleh kosong!", "⚠️");
             return;
         }
 
-        // Update active cashier in parent component, format as "Kasir Name"
-        const formattedCashier = `Kasir ${cleanName}`;
-        onCashierChange(formattedCashier);
+        // 1. Update React state locally
+        onCashierChange(cleanName);
+
+        // 2. Persist directly to Firestore staff_roles collection
+        if (currentUser && currentUser.uid) {
+            try {
+                const staffDocRef = doc(db, "staff_roles", currentUser.uid);
+                await setDoc(staffDocRef, {
+                    uid: currentUser.uid,
+                    email: currentUser.email || '',
+                    displayName: cleanName,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+
+                await recordAuditLog({
+                    action: 'PROFILE_CHANGE',
+                    summary: `User ${currentUser.email} memperbarui nama profil menjadi "${cleanName}"`,
+                    actor: {
+                        uid: currentUser.uid,
+                        email: currentUser.email,
+                        displayName: cleanName,
+                        role: userRole || 'cashier'
+                    },
+                    details: { newDisplayName: cleanName }
+                });
+
+                showToast(`Nama user "${cleanName}" berhasil disimpan ke Firestore!`, "🌸");
+            } catch (err) {
+                console.error("Gagal menyimpan nama user ke Firestore:", err);
+                showToast("Nama aktif diubah, namun gagal sinkron ke cloud.", "⚠️");
+            }
+        } else {
+            showToast(`User aktif diubah menjadi ${cleanName}!`, "🌸");
+        }
     };
 
     const formatMoney = (value) => {
@@ -121,14 +155,14 @@ export default function CashDrawer({ showToast, activeCashier, onCashierChange }
                     <form onSubmit={handleSaveShiftSettings} className="flex flex-col gap-3.5 text-text font-body">
                         {/* Cashier Name Input */}
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-bold uppercase">Nama Kasir Bertugas</label>
+                            <label className="text-[11px] font-bold uppercase">Nama User Bertugas</label>
                             <input 
-                                type="text" 
-                                required 
-                                placeholder="Contoh: Peach" 
-                                value={cashierNameInput} 
+                                type="text"
+                                value={cashierNameInput}
                                 onChange={(e) => setCashierNameInput(e.target.value)}
-                                className="border-2 border-text rounded-xl p-2.5 text-sm outline-none bg-white font-bold focus:bg-yellow-light"
+                                placeholder="Misal: Tenma / Jun"
+                                className="w-full bg-yellow-light/20 border-2 border-text rounded-xl p-2.5 font-bold font-title text-sm focus:outline-none focus:bg-white"
+                                required
                             />
                         </div>
                         

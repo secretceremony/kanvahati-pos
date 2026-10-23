@@ -11,6 +11,7 @@ const Rekapan = React.lazy(() => import('./pages/Rekapan'));
 const HostConsole = React.lazy(() => import('./arcade/pages/HostConsole'));
 const VisitorDisplay = React.lazy(() => import('./arcade/pages/VisitorDisplay'));
 const QuestionBankManager = React.lazy(() => import('./arcade/pages/QuestionBankManager'));
+const SuperAdminHub = React.lazy(() => import('./pages/SuperAdminHub'));
 
 import Login from './pages/Login';
 import ReceiptModal from './components/ReceiptModal';
@@ -18,77 +19,223 @@ import SystemBanner from './components/SystemBanner';
 import { t } from './services/translations';
 import { subscribeAuthState, logoutUser } from './services/auth';
 
-function Navigation() {
+function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
     const location = useLocation();
     const currentPath = location.pathname;
+    const isSuperAdmin = userRole === 'super_admin';
+    const canAccessArcade = userRole === 'admin' || isSuperAdmin || userRole === 'arcade_host';
+
+    // Dropdown state for Laporan & Data
+    const isReportPath = ['/riwayat', '/statistik', '/rekapan'].includes(currentPath);
+    const [reportsOpen, setReportsOpen] = useState(isReportPath);
+
+    useEffect(() => {
+        if (isReportPath) setReportsOpen(true);
+    }, [currentPath]);
+
+    const linkStyle = (path, matchPrefix = false) => {
+        const isActive = matchPrefix ? currentPath.startsWith(path) : currentPath === path;
+        return `flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
+            isActive
+                ? 'bg-yellow text-text border-text shadow-[2px_2px_0px_#32628f] translate-x-1'
+                : 'bg-white/80 text-text/80 border-transparent hover:bg-yellow-light/60 hover:border-text hover:text-text'
+        }`;
+    };
 
     return (
-        <div className="header-nav flex flex-wrap gap-2 justify-center flex-grow">
-            <Link 
-                to="/"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath === '/' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-calculator"></i> {t.terminal}
-            </Link>
-            <Link 
-                to="/kas"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath === '/kas' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-vault"></i> {t.cashDrawer || "Modal Kas"}
-            </Link>
-            <Link 
-                to="/riwayat"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath === '/riwayat' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-clock-rotate-left"></i> {t.logs}
-            </Link>
-            <Link 
-                to="/statistik"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath === '/statistik' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-chart-line"></i> {t.stats}
-            </Link>
-            <Link 
-                to="/stok"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath === '/stok' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-boxes-stacked"></i> {t.inventory}
-            </Link>
-            <Link 
-                to="/promo"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath === '/promo' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-tags"></i> {t.promo || "Promo"}
-            </Link>
-            <Link 
-                to="/rekapan"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath === '/rekapan' ? 'bg-yellow border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-blue-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-file-invoice-dollar"></i> {t.recap || "Rekapan"}
-            </Link>
-            <Link 
-                to="/arcade/host"
-                className={`nav-tab font-title text-[13px] sm:text-[14px] font-bold text-text bg-white border-2 rounded-lg px-3 sm:px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer ${
-                    currentPath.startsWith('/arcade') ? 'bg-pink border-text shadow-[3px_3px_0px_#32628f] translate-y-[-1px] translate-x-[-1px]' : 'border-transparent hover:bg-pink-light hover:border-text'
-                }`}
-            >
-                <i className="fa-solid fa-gamepad"></i> Arcade
-            </Link>
-        </div>
+        <>
+            {/* Mobile Backdrop */}
+            {isOpen && (
+                <div 
+                    onClick={onClose} 
+                    className="fixed inset-0 bg-text/40 backdrop-blur-sm z-40 lg:hidden"
+                />
+            )}
+
+            <aside className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r-[3px] border-text shadow-[4px_0px_0px_#32628f] flex flex-col justify-between transition-transform duration-300 lg:translate-x-0 ${
+                isOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}>
+                {/* Brand & Canopy Banner */}
+                <div>
+                    <div className={`canopy-stripes h-3 border-b-[3px] border-text ${
+                        isSuperAdmin
+                            ? 'bg-[repeating-linear-gradient(90deg,#9333ea_0px,#9333ea_30px,var(--color-white)_30px,var(--color-white)_60px)]'
+                            : 'bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_30px,var(--color-white)_30px,var(--color-white)_60px)]'
+                    }`}></div>
+                    
+                    <div className="p-4 border-b-2 border-text/10 flex items-center justify-between">
+                        <Link to="/" onClick={onClose} className="flex-grow flex items-center justify-center py-1">
+                            <img src="/kanvahati-logo.png" alt="Kanvahati Logo" className="h-11 object-contain" />
+                        </Link>
+                        {/* Close button on mobile */}
+                        <button 
+                            onClick={onClose}
+                            className="lg:hidden p-1.5 text-text hover:text-pink text-sm cursor-pointer ml-2"
+                        >
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    {/* Navigation Groups */}
+                    <div className="p-3.5 space-y-4 overflow-y-auto max-h-[calc(100vh-170px)]">
+                        {/* Kategori 1: Kasir & Penjualan */}
+                        <div>
+                            <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-text/50">
+                                Kasir & Penjualan
+                            </div>
+                            <div className="space-y-1">
+                                <Link to="/" onClick={onClose} className={linkStyle('/')}>
+                                    <i className="fa-solid fa-calculator w-4 text-center"></i>
+                                    <span>{t.terminal}</span>
+                                </Link>
+                                <Link to="/stok" onClick={onClose} className={linkStyle('/stok')}>
+                                    <i className="fa-solid fa-boxes-stacked w-4 text-center"></i>
+                                    <span>{t.inventory}</span>
+                                </Link>
+                                <Link to="/promo" onClick={onClose} className={linkStyle('/promo')}>
+                                    <i className="fa-solid fa-tags w-4 text-center"></i>
+                                    <span>{t.promo || "Promo"}</span>
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Kategori 2: User & Kas */}
+                        <div>
+                            <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-text/50">
+                                Akun & Keuangan
+                            </div>
+                            <div className="space-y-1">
+                                <Link to="/kas" onClick={onClose} className={linkStyle('/kas')}>
+                                    <i className="fa-solid fa-vault w-4 text-center"></i>
+                                    <span>{t.cashDrawer || "Modal Kas"}</span>
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Kategori 3: Laporan & Data (Dropdown) */}
+                        <div>
+                            <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-text/50">
+                                Laporan & Data
+                            </div>
+                            <div className="space-y-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setReportsOpen(prev => !prev)}
+                                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
+                                        isReportPath
+                                            ? 'bg-yellow-light/60 border-text text-text'
+                                            : 'bg-white/80 text-text/80 border-transparent hover:bg-yellow-light/40 hover:text-text'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <i className="fa-solid fa-folder-closed w-4 text-center"></i>
+                                        <span>Laporan Penjualan</span>
+                                    </div>
+                                    <i className={`fa-solid fa-chevron-down text-xs transition-transform duration-200 ${reportsOpen ? 'rotate-180' : ''}`}></i>
+                                </button>
+
+                                {reportsOpen && (
+                                    <div className="pl-4 pt-1 space-y-1 border-l-2 border-text/20 ml-3">
+                                        <Link to="/riwayat" onClick={onClose} className={linkStyle('/riwayat')}>
+                                            <i className="fa-solid fa-clock-rotate-left w-4 text-center"></i>
+                                            <span>{t.logs}</span>
+                                        </Link>
+                                        <Link to="/statistik" onClick={onClose} className={linkStyle('/statistik')}>
+                                            <i className="fa-solid fa-chart-line w-4 text-center"></i>
+                                            <span>{t.stats}</span>
+                                        </Link>
+                                        <Link to="/rekapan" onClick={onClose} className={linkStyle('/rekapan')}>
+                                            <i className="fa-solid fa-file-invoice-dollar w-4 text-center"></i>
+                                            <span>{t.recap || "Rekapan"}</span>
+                                        </Link>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Kategori 4: Arcade Zone */}
+                        {canAccessArcade && (
+                            <div>
+                                <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-text/50">
+                                    Arcade Zone
+                                </div>
+                                <div className="space-y-1">
+                                    <Link 
+                                        to="/arcade/host" 
+                                        onClick={onClose} 
+                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
+                                            currentPath === '/arcade/host'
+                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#32628f] translate-x-1'
+                                                : 'bg-white/80 text-text/80 border-transparent hover:bg-pink-light hover:border-text hover:text-text'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-gamepad w-4 text-center"></i>
+                                        <span>Host Console</span>
+                                    </Link>
+                                    <Link 
+                                        to="/arcade/questions" 
+                                        onClick={onClose} 
+                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
+                                            currentPath === '/arcade/questions'
+                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#32628f] translate-x-1'
+                                                : 'bg-white/80 text-text/80 border-transparent hover:bg-pink-light hover:border-text hover:text-text'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-book-open w-4 text-center"></i>
+                                        <span>Bank Soal</span>
+                                    </Link>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Kategori 5: Super Admin Hub */}
+                        {isSuperAdmin && (
+                            <div>
+                                <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-text/50">
+                                    Super Admin
+                                </div>
+                                <div className="space-y-1">
+                                    <Link 
+                                        to="/admin" 
+                                        onClick={onClose} 
+                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer shadow-[2px_2px_0px_#32628f] ${
+                                            currentPath === '/admin'
+                                                ? 'bg-purple-700 text-white border-text translate-x-1'
+                                                : 'bg-purple-600 text-white border-text hover:bg-purple-700'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-shield-halved w-4 text-center"></i>
+                                        <span>Admin Hub</span>
+                                    </Link>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Profile Footer */}
+                <div className="p-3 pb-6 border-t-2 border-text/10 bg-yellow-light/20 flex items-center justify-between gap-2">
+                    <div className="flex flex-col min-w-0">
+                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-text self-start leading-none mb-1 ${
+                            isSuperAdmin ? 'bg-purple-200 text-purple-950 font-black' : 'bg-pink-light text-text'
+                        }`}>
+                            {isSuperAdmin ? '👑 SUPER ADMIN' : (userRole || 'KASIR')}
+                        </span>
+                        <span className="text-xs font-bold font-title text-text truncate">
+                            {activeCashier}
+                        </span>
+                    </div>
+
+                    <button
+                        onClick={onLogout}
+                        className="text-pink bg-white border-2 border-text rounded-full p-2 hover:bg-pink-light transition-all cursor-pointer text-xs shadow-[1.5px_1.5px_0px_#32628f] shrink-0"
+                        title="Keluar / Logout"
+                    >
+                        <i className="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </aside>
+        </>
     );
 }
 
@@ -120,86 +267,127 @@ function MainRoutes({
         );
     }
 
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // Dynamic Page Title mapping
+    const getPageTitle = (pathname) => {
+        switch (pathname) {
+            case '/': return 'Kasir';
+            case '/stok': return 'Stok Barang';
+            case '/promo': return 'Promo Bundle';
+            case '/kas': return 'Akun Kasir';
+            case '/riwayat': return 'Riwayat Transaksi';
+            case '/statistik': return 'Statistik';
+            case '/rekapan': return 'Rekapan Penjualan';
+            case '/arcade/host': return 'Arcade Host';
+            case '/arcade/questions': return 'Bank Soal';
+            case '/admin': return 'Admin Hub';
+            default:
+                if (pathname.startsWith('/riwayat')) return 'Riwayat Transaksi';
+                if (pathname.startsWith('/arcade/questions')) return 'Bank Soal';
+                if (pathname.startsWith('/arcade')) return 'Arcade Host';
+                return 'Kasir';
+        }
+    };
+
+    const pageTitle = getPageTitle(location.pathname);
+
     return (
-        <div className="pos-container max-w-[1350px] mx-auto px-4 my-5 flex flex-col min-h-screen h-auto pb-12">
-            <SystemBanner />
-            {/* Storefront Canopy Header */}
-            <header className="pos-header bg-white border-[3px] border-text rounded-[24px] shadow-card mb-5 overflow-hidden shrink-0">
-                <div className="canopy-stripes h-3 bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_35px,var(--color-white)_35px,var(--color-white)_70px)] border-b-[3px] border-text"></div>
-                <div className="header-content flex flex-col md:flex-row justify-between items-center p-3 md:px-5 gap-3">
-                    {/* Logo Section */}
-                    <div className="pos-logo flex flex-wrap items-center gap-3">
-                        <img 
-                            src="/kanvahati-logo.png" 
-                            alt="Kanvahati Logo" 
-                            className="h-10 object-contain"
-                        />
-                        <span className="badge-terminal bg-blue-light border-2 border-text rounded-full px-2.5 py-0.5 text-[11px] font-bold text-text">
-                            Terminal #01
-                        </span>
-                        <span className="badge-role bg-pink-light border-2 border-text rounded-full px-2.5 py-0.5 text-[10px] font-bold text-text uppercase tracking-wider">
-                            {userRole || 'KASIR'}
-                        </span>
-                        {/* Cashier Selector */}
-                        <div className="flex items-center gap-2 border-2 border-text rounded-full px-3 py-0.5 bg-yellow-light/30 text-text">
-                            <span className="text-[10px] font-bold opacity-70 uppercase">Kasir:</span>
-                            <span className="text-[11.5px] font-bold font-title">{activeCashier}</span>
-                            <button 
-                                onClick={() => {
-                                    const cleanName = activeCashier.replace(/^Kasir\s+/, '');
-                                    const newName = prompt("Ubah nama kasir:", cleanName);
-                                    handleCashierChange(newName);
-                                }}
-                                className="text-text hover:text-pink hover:scale-110 cursor-pointer text-[10px] flex items-center"
-                                title="Ubah nama kasir"
-                            >
-                                <i className="fa-solid fa-pen-to-square"></i>
-                            </button>
-                        </div>
-                        {/* Logout button */}
-                        <button 
-                            onClick={async () => {
-                                if (window.confirm("Apakah Anda yakin ingin logout?")) {
-                                    await logoutUser();
-                                    showToast("Sesi telah ditutup. Anda telah keluar.", "🔒");
-                                }
-                            }}
-                            className="text-pink bg-white border-2 border-text rounded-full p-1.5 hover:bg-pink-light hover:scale-110 transition-all cursor-pointer flex items-center justify-center text-xs shadow-[1.5px_1.5px_0px_#32628f] shrink-0"
-                            title="Keluar / Logout"
-                        >
-                            <i className="fa-solid fa-right-from-bracket"></i>
-                        </button>
-                    </div>
-
-                    {/* Tab Navigation buttons */}
-                    <Navigation />
-                </div>
-            </header>
-
-            {/* Content Tabs Body */}
-            <main className="pos-body flex-grow overflow-visible relative pb-8">
-                <React.Suspense fallback={<div className="text-center py-12 font-bold text-text/60">Memuat Halaman...</div>}>
-                    <Routes>
-                        <Route path="/" element={<Register onCheckoutSuccess={handleCheckoutSuccess} showToast={showToast} activeCashier={activeCashier} />} />
-                        <Route path="/kas" element={<CashDrawer showToast={showToast} activeCashier={activeCashier} onCashierChange={handleCashierChange} />} />
-                        <Route path="/riwayat" element={<Logs onReprint={handleReprint} showToast={showToast} />} />
-                        <Route path="/statistik" element={<Stats />} />
-                        <Route path="/stok" element={<Inventory showToast={showToast} />} />
-                        <Route path="/promo" element={<Bundles />} />
-                        <Route path="/rekapan" element={<Rekapan showToast={showToast} />} />
-                        <Route path="/arcade/host" element={<HostConsole currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
-                        <Route path="/arcade/questions" element={<QuestionBankManager currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                </React.Suspense>
-            </main>
-
-            {/* Receipt Modal */}
-            <ReceiptModal 
-                transaction={activeTransaction} 
-                onClose={handleCloseReceipt} 
-                onPrint={handlePrintReceipt}
+        <div className="pos-app-layout min-h-screen bg-blue-light/10 flex">
+            {/* Sidebar Navigation */}
+            <Sidebar 
+                userRole={userRole} 
+                activeCashier={activeCashier} 
+                onLogout={async () => {
+                    if (window.confirm("Apakah Anda yakin ingin logout?")) {
+                        await logoutUser();
+                        showToast("Sesi telah ditutup. Anda telah keluar.", "🔒");
+                    }
+                }}
+                isOpen={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
             />
+
+            {/* Main Content Container with left margin on Desktop */}
+            <div className="flex-1 flex flex-col min-h-screen w-full lg:pl-64">
+                <div className="pos-container max-w-[1350px] w-full mx-auto px-3 sm:px-6 my-4 sm:my-5 flex flex-col flex-grow h-auto pb-12">
+                    <SystemBanner />
+                    
+                    {/* Top Bar on Mobile & Desktop */}
+                    <header className="pos-header bg-white border-[3px] border-text rounded-[20px] shadow-card mb-5 overflow-hidden shrink-0">
+                        <div className={`canopy-stripes h-2.5 border-b-[3px] border-text ${
+                            userRole === 'super_admin'
+                                ? 'bg-[repeating-linear-gradient(90deg,#9333ea_0px,#9333ea_30px,var(--color-white)_30px,var(--color-white)_60px)]'
+                                : 'bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_30px,var(--color-white)_30px,var(--color-white)_60px)]'
+                        }`}></div>
+
+                        <div className="header-content flex justify-between items-center px-3 sm:px-4 py-2 sm:py-2.5 gap-2">
+                            {/* Left: Mobile hamburger & Dynamic Page Title */}
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                <button
+                                    onClick={() => setSidebarOpen(true)}
+                                    className="lg:hidden p-1.5 sm:p-2 rounded-xl border-2 border-text bg-yellow text-text shadow-[2px_2px_0px_#32628f] hover:bg-yellow-light cursor-pointer text-xs sm:text-sm shrink-0"
+                                    title="Buka Menu"
+                                >
+                                    <i className="fa-solid fa-bars"></i>
+                                </button>
+
+                                {/* Dynamic Page Title in Theme font-title (DynaPuff) */}
+                                <h2 className="font-title text-sm sm:text-lg font-bold text-text tracking-wide title-stroke truncate">
+                                    {pageTitle}
+                                </h2>
+                            </div>
+
+                            {/* Right: User Badge & Role (Positioned to the right of Page Title) */}
+                            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                                <span className={`badge-role border-2 border-text rounded-full px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                                    userRole === 'super_admin' ? 'bg-purple-200 text-purple-950 font-black' : 'bg-pink-light text-text'
+                                }`}>
+                                    <span className="inline sm:hidden">{userRole === 'super_admin' ? '👑 ADMIN' : (userRole || 'KASIR')}</span>
+                                    <span className="hidden sm:inline">{userRole === 'super_admin' ? '👑 SUPER ADMIN' : (userRole || 'KASIR')}</span>
+                                </span>
+                                
+                                <div className="flex items-center gap-1 sm:gap-2 border-2 border-text rounded-full px-2 sm:px-3 py-0.5 bg-yellow-light/30 text-text shrink-0">
+                                    <span className="hidden sm:inline font-body text-[10px] font-bold opacity-70 uppercase">User:</span>
+                                    <span className="font-title text-[10.5px] sm:text-[11.5px] font-bold truncate max-w-[90px] sm:max-w-none">{activeCashier}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Content Tabs Body */}
+                    <main className="pos-body flex-grow overflow-visible relative pb-8">
+                        <React.Suspense fallback={<div className="text-center py-12 font-bold text-text/60">Memuat Halaman...</div>}>
+                            <Routes>
+                                <Route path="/" element={<Register onCheckoutSuccess={handleCheckoutSuccess} showToast={showToast} activeCashier={activeCashier} />} />
+                                <Route path="/kas" element={<CashDrawer showToast={showToast} activeCashier={activeCashier} onCashierChange={handleCashierChange} currentUser={currentUser} userRole={userRole} />} />
+                                <Route path="/riwayat" element={<Logs onReprint={handleReprint} showToast={showToast} currentUser={currentUser} userRole={userRole} />} />
+                                <Route path="/statistik" element={<Stats />} />
+                                <Route path="/stok" element={<Inventory showToast={showToast} currentUser={currentUser} userRole={userRole} />} />
+                                <Route path="/promo" element={<Bundles showToast={showToast} currentUser={currentUser} userRole={userRole} />} />
+                                <Route path="/rekapan" element={<Rekapan showToast={showToast} />} />
+                                <Route path="/arcade/host" element={<HostConsole currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
+                                <Route path="/arcade/questions" element={<QuestionBankManager currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
+                                <Route path="/admin" element={
+                                    userRole === 'super_admin' ? (
+                                        <SuperAdminHub currentUser={currentUser} userRole={userRole} showToast={showToast} />
+                                    ) : (
+                                        <Navigate to="/" replace />
+                                    )
+                                } />
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                            </Routes>
+                        </React.Suspense>
+                    </main>
+
+                    {/* Receipt Modal */}
+                    <ReceiptModal 
+                        transaction={activeTransaction} 
+                        onClose={handleCloseReceipt} 
+                        onPrint={handlePrintReceipt}
+                    />
+                </div>
+            </div>
         </div>
     );
 }
@@ -207,13 +395,10 @@ function MainRoutes({
 export default function App() {
     const [activeTransaction, setActiveTransaction] = useState(null);
     const [toast, setToast] = useState({ show: false, message: '', icon: '✨' });
-    const [activeCashier, setActiveCashier] = useState(() => {
-        return localStorage.getItem('kanvahati_cashier') || "Kasir Peach 🌸";
-    });
-    
     // Firebase Auth State
     const [currentUser, setCurrentUser] = useState(null);
     const [userRole, setUserRole] = useState(null);
+    const [activeCashier, setActiveCashier] = useState('User');
     const [authLoading, setAuthLoading] = useState(true);
 
     useEffect(() => {
@@ -230,25 +415,18 @@ export default function App() {
             };
             setCurrentUser(mockUser);
             setUserRole(demoRole);
+            setActiveCashier(mockUser.displayName);
             setAuthLoading(false);
             return;
         }
 
-        const unsubscribe = subscribeAuthState(({ user, role, isAuthenticated }) => {
+        const unsubscribe = subscribeAuthState(({ user, role, displayName, isAuthenticated }) => {
             setCurrentUser(user);
             setUserRole(role);
-            setAuthLoading(false);
-            if (user && user.email) {
-                // If cashier name not explicitly modified, set to user's display / email
-                const emailPrefix = user.email.split('@')[0];
-                const cleanPrefix = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
-                const currentStored = localStorage.getItem('kanvahati_cashier');
-                if (!currentStored || currentStored === "Kasir Peach 🌸") {
-                    const defaultName = `Kasir ${cleanPrefix}`;
-                    setActiveCashier(defaultName);
-                    localStorage.setItem('kanvahati_cashier', defaultName);
-                }
+            if (displayName) {
+                setActiveCashier(displayName);
             }
+            setAuthLoading(false);
         });
 
         return () => unsubscribe();
@@ -256,10 +434,9 @@ export default function App() {
 
     const handleCashierChange = (newName) => {
         if (newName && newName.trim()) {
-            const formatted = newName.trim().startsWith("Kasir ") ? newName.trim() : `Kasir ${newName.trim()}`;
+            const formatted = newName.trim().replace(/^Kasir\s+/i, '');
             setActiveCashier(formatted);
-            localStorage.setItem('kanvahati_cashier', formatted);
-            showToast(`Nama kasir diubah ke ${formatted}`, "🌸");
+            showToast(`User diubah ke ${formatted}`, "🌸");
         }
     };
 
