@@ -48,6 +48,14 @@ export default function Inventory({ showToast, currentUser, userRole }) {
     const [selectedProducts, setSelectedProducts] = useState([]);
     const [editingProduct, setEditingProduct] = useState(null);
 
+    // Search, Filter, Sort & Pagination State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterCategory, setFilterCategory] = useState('all');
+    const [filterVisibility, setFilterVisibility] = useState('all'); // all, visible, hidden
+    const [sortBy, setSortBy] = useState('name_asc'); // name_asc, name_desc, price_asc, price_desc, stock_asc, stock_desc
+    const [pageSize, setPageSize] = useState(20); // 20, 40, 60
+    const [currentPage, setCurrentPage] = useState(1);
+
     // CSV Import Modal state
     const [showImportModal, setShowImportModal] = useState(false);
     const [importPreview, setImportPreview] = useState([]);
@@ -565,6 +573,30 @@ export default function Inventory({ showToast, currentUser, userRole }) {
         return `Rp ${priceVal.toLocaleString('id-ID')}`;
     };
 
+    // Filter, search, and sort products
+    const processedProducts = products.filter(p => {
+        const matchesSearch = !searchTerm || 
+            p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            p.id.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = filterCategory === 'all' || p.category === filterCategory;
+        const matchesVisibility = filterVisibility === 'all' ||
+            (filterVisibility === 'visible' && !p.hiddenFromCatalogue) ||
+            (filterVisibility === 'hidden' && p.hiddenFromCatalogue);
+        return matchesSearch && matchesCategory && matchesVisibility;
+    }).sort((a, b) => {
+        if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+        if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
+        if (sortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
+        if (sortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
+        if (sortBy === 'stock_asc') return (a.stock || 0) - (b.stock || 0);
+        if (sortBy === 'stock_desc') return (b.stock || 0) - (a.stock || 0);
+        return 0;
+    });
+
+    // Pagination calculations
+    const totalPages = Math.max(1, Math.ceil(processedProducts.length / pageSize));
+    const paginatedProducts = processedProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
     // Toggle hide from catalogue
     const handleToggleCatalogueVisibility = async (product) => {
         const newHiddenState = !product.hiddenFromCatalogue;
@@ -797,7 +829,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
     };
 
     return (
-        <div className="inventory-layout flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_2fr] lg:gap-5 h-auto overflow-visible pb-10">
+        <div className="inventory-layout flex flex-col gap-3 lg:grid lg:grid-cols-[1.18fr_1.82fr] lg:gap-6 h-auto overflow-visible pb-12">
             {/* Mobile View Tab Selector */}
             <div className="lg:hidden flex border-2 border-text rounded-xl overflow-hidden mb-1 shrink-0 bg-white font-title text-xs font-bold shadow-[2px_2px_0px_#181818] w-full">
                 <button 
@@ -958,7 +990,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                     />
                                                 </div>
 
-                                                <div className="flex flex-col gap-1 w-[80px]">
+                                                <div className="flex flex-col gap-1 w-[95px] sm:w-[110px]">
                                                     <input 
                                                         type="number" 
                                                         placeholder="Harga" 
@@ -969,7 +1001,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                     />
                                                 </div>
 
-                                                <div className="flex flex-col gap-1 w-[60px]">
+                                                <div className="flex flex-col gap-1 w-[70px] sm:w-[85px]">
                                                     <input 
                                                         type="number" 
                                                         placeholder="Stok" 
@@ -1143,6 +1175,108 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                     </div>
                 </div>
 
+                {/* Search, Filter, Sort & View Controls */}
+                <div className="bg-yellow-light/30 border-2 border-text rounded-xl p-3 mb-3.5 flex flex-col gap-2.5 shrink-0 shadow-[2px_2px_0px_#181818]">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                        {/* Search Input */}
+                        <div className="sm:col-span-5 relative flex items-center">
+                            <i className="fa-solid fa-magnifying-glass absolute left-3 text-text/60 text-xs"></i>
+                            <input 
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                placeholder="Cari nama atau kode SKU..."
+                                className="w-full border-2 border-text rounded-xl py-1.5 pl-8 pr-3 text-xs outline-none bg-white font-medium focus:bg-yellow-light/20"
+                            />
+                            {searchTerm && (
+                                <button 
+                                    onClick={() => setSearchTerm('')} 
+                                    className="absolute right-2.5 text-xs text-text/50 hover:text-pink"
+                                >
+                                    <i className="fa-solid fa-xmark"></i>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Category Filter */}
+                        <div className="sm:col-span-3">
+                            <select 
+                                value={filterCategory}
+                                onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }}
+                                className="w-full border-2 border-text rounded-xl py-1.5 px-2 text-xs outline-none bg-white font-title font-bold cursor-pointer"
+                            >
+                                <option value="all">Semua Kategori</option>
+                                {categories.map(c => (
+                                    <option key={c} value={c}>{getCategoryDisplayLabel(c)}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Sort Order Selector */}
+                        <div className="sm:col-span-4">
+                            <select 
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="w-full border-2 border-text rounded-xl py-1.5 px-2 text-xs outline-none bg-white font-title font-bold cursor-pointer"
+                            >
+                                <option value="name_asc">Urutkan: Nama (A-Z)</option>
+                                <option value="name_desc">Urutkan: Nama (Z-A)</option>
+                                <option value="price_asc">Urutkan: Harga Terendah</option>
+                                <option value="price_desc">Urutkan: Harga Tertinggi</option>
+                                <option value="stock_asc">Urutkan: Stok Tersedikit</option>
+                                <option value="stock_desc">Urutkan: Stok Terbanyak</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-dashed border-text/15 text-xs">
+                        {/* Visibility Pill Filters */}
+                        <div className="flex items-center gap-1.5 font-tag font-bold">
+                            <span className="text-[10px] text-text/60 uppercase mr-1">Visibilitas:</span>
+                            <button
+                                onClick={() => { setFilterVisibility('all'); setCurrentPage(1); }}
+                                className={`px-2.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-all ${
+                                    filterVisibility === 'all' ? 'bg-yellow text-text border-text font-black shadow-[1px_1px_0px_#181818]' : 'bg-white text-text/70 border-text/30 hover:border-text'
+                                }`}
+                            >
+                                Semua
+                            </button>
+                            <button
+                                onClick={() => { setFilterVisibility('visible'); setCurrentPage(1); }}
+                                className={`px-2.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-all ${
+                                    filterVisibility === 'visible' ? 'bg-emerald-100 text-emerald-800 border-text font-black shadow-[1px_1px_0px_#181818]' : 'bg-white text-text/70 border-text/30 hover:border-text'
+                                }`}
+                            >
+                                Visible
+                            </button>
+                            <button
+                                onClick={() => { setFilterVisibility('hidden'); setCurrentPage(1); }}
+                                className={`px-2.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-all ${
+                                    filterVisibility === 'hidden' ? 'bg-pink text-text border-text font-black shadow-[1px_1px_0px_#181818]' : 'bg-white text-text/70 border-text/30 hover:border-text'
+                                }`}
+                            >
+                                Hidden
+                            </button>
+                        </div>
+
+                        {/* Page Size Selector */}
+                        <div className="flex items-center gap-1.5 font-tag font-bold ml-auto">
+                            <span className="text-[10px] text-text/60 uppercase">Tampilkan:</span>
+                            {[20, 40, 60].map(sz => (
+                                <button
+                                    key={sz}
+                                    onClick={() => { setPageSize(sz); setCurrentPage(1); }}
+                                    className={`px-2 py-0.5 rounded border text-[10px] cursor-pointer transition-all ${
+                                        pageSize === sz ? 'bg-pink text-white border-text font-black shadow-[1px_1px_0px_#181818]' : 'bg-white text-text border-text/30 hover:border-text'
+                                    }`}
+                                >
+                                    {sz}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Bulk Delete Bar */}
                 {selectedProducts.length > 0 && (
                     <div className="flex justify-between items-center bg-pink-light border-2 border-text rounded-xl p-3 mb-3 text-text font-body animate-[fade_0.2s_ease] shrink-0">
@@ -1164,14 +1298,14 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                     </div>
                 )}
 
-                <div className="table-container flex-grow overflow-y-auto max-h-[600px] lg:max-h-[650px] pb-10 pr-0.5">
+                <div className="table-container flex-grow overflow-y-auto max-h-[720px] pb-10 pr-0.5">
                     {loading ? (
                         <div className="text-center py-12 font-bold text-text/60">{t.loadingProducts}</div>
                     ) : (
                         <>
                             {/* 1. Mobile Card List (< lg) */}
                             <div className="block lg:hidden space-y-3">
-                                {products.map(prod => (
+                                {paginatedProducts.map(prod => (
                                     <ProductCardMobile
                                         key={prod.id}
                                         product={prod}
@@ -1222,8 +1356,8 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {products.map(prod => {
-                                    const isLowStock = prod.stock < 10;
+                                {paginatedProducts.map(prod => {
+                                    const isLowStock = prod.stock <= 5;
                                     const hasVars = prod.variations && prod.variations.length > 0;
                                     const isExpanded = expandedProductId === prod.id;
 
@@ -1299,20 +1433,13 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         </button>
 
                                                         {/* Restock Button (Hidden for variations as they restock individually inside expansion) */}
-                                                        {!hasVars ? (
+                                                        {!hasVars && (
                                                             <button 
                                                                 onClick={() => handleRestockClick(prod)}
                                                                 title="Isi stok barang"
                                                                 className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                             >
                                                                 <i className="fa-solid fa-box-open"></i> {t.restock || "Isi Stok"}
-                                                            </button>
-                                                        ) : (
-                                                            <button 
-                                                                onClick={() => setExpandedProductId(isExpanded ? null : prod.id)}
-                                                                className="btn bg-yellow-light text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
-                                                            >
-                                                                <i className="fa-solid fa-layer-group"></i> Variasi
                                                             </button>
                                                         )}
 
@@ -1388,6 +1515,45 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                             </tbody>
                         </table>
                             </div>
+
+                            {/* Pagination Controls Bar */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t-2 border-text/10 shrink-0 font-body text-xs">
+                                <span className="text-text/70">
+                                    Menampilkan <strong>{processedProducts.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> - <strong>{Math.min(currentPage * pageSize, processedProducts.length)}</strong> dari <strong>{processedProducts.length}</strong> produk
+                                </span>
+
+                                <div className="flex items-center gap-1.5 font-tag font-bold">
+                                    <button
+                                        type="button"
+                                        disabled={currentPage <= 1}
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        className={`px-3 py-1.5 rounded-lg border-2 border-text transition-all ${
+                                            currentPage <= 1 
+                                                ? 'bg-gray-100 text-gray-400 border-gray-300 opacity-60 cursor-not-allowed' 
+                                                : 'bg-white text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] cursor-pointer'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-chevron-left text-[10px]"></i> Sebelumnya
+                                    </button>
+
+                                    <span className="bg-yellow-light border border-text px-3 py-1.5 rounded-lg font-bold">
+                                        Hal {currentPage} / {totalPages}
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        disabled={currentPage >= totalPages}
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        className={`px-3 py-1.5 rounded-lg border-2 border-text transition-all ${
+                                            currentPage >= totalPages 
+                                                ? 'bg-gray-100 text-gray-400 border-gray-300 opacity-60 cursor-not-allowed' 
+                                                : 'bg-white text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] cursor-pointer'
+                                        }`}
+                                    >
+                                        Berikutnya <i className="fa-solid fa-chevron-right text-[10px]"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </>
                     )}
                 </div>
@@ -1452,262 +1618,266 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 </div>
             )}
 
-            {/* Edit Product Modal overlay */}
+            {/* Edit Product Modal overlay (Wide 2-Column Responsive Layout) */}
             {editingProduct && (
-                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4 animate-[fade_0.2s_ease]">
-                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[420px] max-h-[90vh] overflow-hidden flex flex-col p-5 text-text relative">
-                        <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
+                <div className="fixed inset-0 bg-[#181818]/60 backdrop-blur-sm z-[10001] flex justify-center items-center p-3 sm:p-5 animate-[fade_0.2s_ease]">
+                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col p-4 sm:p-6 text-text relative">
+                        <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-3deg] h-6 w-28 bg-pink-light"></div>
                         
-                        <div className="w-full flex justify-between items-center border-b border-text/10 pb-2.5 mb-4 border-dashed">
-                            <span className="font-title text-base font-bold text-center w-full">Edit Detail Barang</span>
+                        <div className="w-full flex justify-between items-center border-b-2 border-text/10 pb-3 mb-4 border-dashed shrink-0">
+                            <span className="font-title text-base sm:text-lg font-bold flex items-center gap-2">
+                                <i className="fa-solid fa-pen-to-square text-pink"></i>
+                                <span>Edit Detail Barang • <span className="font-mono text-xs text-text/60">{editingProduct.id}</span></span>
+                            </span>
                             <button 
                                 onClick={() => setEditingProduct(null)}
-                                className="absolute right-4 text-text hover:text-pink transition-transform hover:scale-110 cursor-pointer"
+                                className="text-text hover:text-pink transition-transform hover:scale-110 cursor-pointer p-1"
                             >
-                                <i className="fa-solid fa-xmark text-lg"></i>
+                                <i className="fa-solid fa-xmark text-xl"></i>
                             </button>
                         </div>
                         
-                        <form onSubmit={handleEditSubmit} className="w-full flex flex-col gap-3.5 overflow-y-auto pr-1">
-                            {/* Product Code (Read Only) */}
-                            <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold uppercase text-text/60">Kode Barang (Tidak dapat diubah)</label>
-                                <input 
-                                    type="text" 
-                                    disabled
-                                    value={editingProduct.id} 
-                                    className="border-2 border-text rounded-xl p-2 text-xs bg-text/5 text-text/50 font-bold outline-none cursor-not-allowed select-none"
-                                />
-                            </div>
-
-                            {/* Name */}
-                            <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold uppercase text-text/80">Nama Barang</label>
-                                <input 
-                                    type="text" 
-                                    required 
-                                    value={editingProduct.name}
-                                    onChange={(e) => setEditingProduct(prev => ({ ...prev, name: e.target.value }))}
-                                    className="border-2 border-text rounded-xl p-2.5 text-xs outline-none bg-white font-bold"
-                                />
-                            </div>
-
-                            {/* Category */}
-                            <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold uppercase text-text/80">Kategori</label>
-                                <select 
-                                    value={editingProduct.category} 
-                                    onChange={(e) => setEditingProduct(prev => ({ ...prev, category: e.target.value }))}
-                                    className="border-2 border-text rounded-xl p-2.5 text-xs outline-none bg-white font-title cursor-pointer"
-                                >
-                                    {categories.map(cat => (
-                                        <option key={cat} value={cat}>{getCategoryDisplayLabel(cat)}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Tag */}
-                            <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold uppercase text-text/80">Tag</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="Contoh: BARU atau TERLARIS (Opsional)" 
-                                    value={editingProduct.tag}
-                                    onChange={(e) => setEditingProduct(prev => ({ ...prev, tag: e.target.value }))}
-                                    className="border-2 border-text rounded-xl p-2.5 text-xs outline-none bg-white"
-                                />
-                            </div>
-
-                            {/* Hide from Catalogue Toggle */}
-                            <div className="flex items-center gap-2 py-0.5">
-                                <input 
-                                    type="checkbox" 
-                                    id="edit-hidden-from-catalogue" 
-                                    checked={editingProduct.hiddenFromCatalogue} 
-                                    onChange={(e) => setEditingProduct(prev => ({ 
-                                        ...prev, 
-                                        hiddenFromCatalogue: e.target.checked 
-                                    }))}
-                                    className="w-4 h-4 accent-pink border-2 border-text rounded cursor-pointer"
-                                />
-                                <label htmlFor="edit-hidden-from-catalogue" className="text-xs font-bold cursor-pointer select-none flex items-center gap-1.5">
-                                    <i className="fa-solid fa-eye-slash text-pink"></i>
-                                    Sembunyikan dari katalog menu kasir POS?
-                                </label>
-                            </div>
-
-                            {/* Variations Checkbox */}
-                            <div className="flex items-center gap-2 py-0.5">
-                                <input 
-                                    type="checkbox" 
-                                    id="edit-has-variations" 
-                                    checked={editingProduct.hasVariations} 
-                                    onChange={(e) => setEditingProduct(prev => ({ 
-                                        ...prev, 
-                                        hasVariations: e.target.checked,
-                                        variationsList: prev.variationsList && prev.variationsList.length > 0 ? prev.variationsList : [{ name: '', price: '', stock: '10' }]
-                                    }))}
-                                    className="w-4 h-4 accent-pink border-2 border-text rounded cursor-pointer"
-                                />
-                                <label htmlFor="edit-has-variations" className="text-xs font-bold cursor-pointer select-none">
-                                    Memiliki variasi produk? (Contoh: Warna, Ukuran)
-                                </label>
-                            </div>
-
-                            {/* Base Price and Stock (Shown only if no variations) */}
-                            {!editingProduct.hasVariations ? (
-                                <>
-                                <div className="grid grid-cols-2 gap-3">
+                        <form onSubmit={handleEditSubmit} className="w-full flex flex-col flex-grow overflow-hidden">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 flex-grow overflow-y-auto pr-1 pb-2">
+                                {/* Left Column: Core Metadata */}
+                                <div className="flex flex-col gap-3">
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold uppercase text-text/80">Harga (Rupiah)</label>
+                                        <label className="text-[11px] font-bold uppercase text-text/60">Kode Barang</label>
                                         <input 
-                                            type="number" 
-                                            required={!editingProduct.hasVariations}
-                                            value={editingProduct.price}
-                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, price: e.target.value }))}
-                                            className="border-2 border-text rounded-xl p-2 text-xs outline-none bg-white font-bold"
+                                            type="text" 
+                                            disabled
+                                            value={editingProduct.id} 
+                                            className="border-2 border-text rounded-xl p-2.5 text-xs bg-text/5 text-text/50 font-bold outline-none cursor-not-allowed select-none"
                                         />
                                     </div>
+
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold uppercase text-text/80">Stok</label>
+                                        <label className="text-[11px] font-bold uppercase text-text/80">Nama Barang</label>
                                         <input 
-                                            type="number" 
-                                            required={!editingProduct.hasVariations}
-                                            min="0"
-                                            value={editingProduct.stock}
-                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, stock: e.target.value }))}
-                                            className="border-2 border-text rounded-xl p-2 text-xs outline-none bg-white font-bold"
+                                            type="text" 
+                                            required 
+                                            value={editingProduct.name}
+                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, name: e.target.value }))}
+                                            className="border-2 border-text rounded-xl p-2.5 text-xs outline-none bg-white font-bold focus:bg-yellow-light/30"
                                         />
                                     </div>
-                                </div>
 
-                                {/* Per-item Discount Field */}
-                                <div className="flex flex-col gap-1 mt-1">
-                                    <label className="text-[10px] font-bold uppercase text-pink flex items-center gap-1">
-                                        <i className="fa-solid fa-tag"></i> Diskon per Item (Rp) — Cuci Gudang / Wholesale
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                        <input 
-                                            type="number" 
-                                            min="0"
-                                            max={editingProduct.price || 0}
-                                            value={editingProduct.discount}
-                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, discount: e.target.value }))}
-                                            placeholder="0"
-                                            className="border-2 border-pink/60 rounded-xl p-2 text-xs outline-none bg-pink-light/20 font-bold flex-grow focus:border-pink"
-                                        />
-                                        {parseFloat(editingProduct.discount || 0) > 0 && (
-                                            <button 
-                                                type="button" 
-                                                onClick={() => setEditingProduct(prev => ({ ...prev, discount: '0' }))}
-                                                className="text-[9px] bg-white text-pink border-2 border-pink rounded-full px-2.5 py-1 font-bold cursor-pointer hover:bg-pink-light transition-all shrink-0"
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[11px] font-bold uppercase text-text/80">Kategori</label>
+                                            <select 
+                                                value={editingProduct.category} 
+                                                onChange={(e) => setEditingProduct(prev => ({ ...prev, category: e.target.value }))}
+                                                className="border-2 border-text rounded-xl p-2 text-xs outline-none bg-white font-title cursor-pointer"
                                             >
-                                                <i className="fa-solid fa-xmark"></i> Hapus Diskon
-                                            </button>
-                                        )}
+                                                {categories.map(cat => (
+                                                    <option key={cat} value={cat}>{getCategoryDisplayLabel(cat)}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[11px] font-bold uppercase text-text/80">Tag</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="BARU / TERLARIS" 
+                                                value={editingProduct.tag}
+                                                onChange={(e) => setEditingProduct(prev => ({ ...prev, tag: e.target.value }))}
+                                                className="border-2 border-text rounded-xl p-2 text-xs outline-none bg-white"
+                                            />
+                                        </div>
                                     </div>
-                                    {parseFloat(editingProduct.discount || 0) > 0 && parseFloat(editingProduct.price || 0) > 0 && (
-                                        <div className="text-[10px] text-pink font-bold bg-pink-light/30 rounded-lg px-2.5 py-1.5 mt-0.5 border border-pink/20">
-                                            Harga setelah diskon: <span className="text-text">{formatPrice(Math.max(0, parseFloat(editingProduct.price) - parseFloat(editingProduct.discount)))}</span>
-                                            <span className="opacity-60 ml-1">(hemat {Math.round((parseFloat(editingProduct.discount) / parseFloat(editingProduct.price)) * 100)}%)</span>
+
+                                    {/* Hide from Catalogue Toggle */}
+                                    <div className="flex items-center gap-2 py-1 bg-yellow-light/30 border border-text/15 rounded-xl px-3 mt-1">
+                                        <input 
+                                            type="checkbox" 
+                                            id="edit-hidden-from-catalogue" 
+                                            checked={editingProduct.hiddenFromCatalogue} 
+                                            onChange={(e) => setEditingProduct(prev => ({ 
+                                                ...prev, 
+                                                hiddenFromCatalogue: e.target.checked 
+                                            }))}
+                                            className="w-4 h-4 accent-pink border-2 border-text rounded cursor-pointer"
+                                        />
+                                        <label htmlFor="edit-hidden-from-catalogue" className="text-xs font-bold cursor-pointer select-none flex items-center gap-1.5">
+                                            <i className="fa-solid fa-eye-slash text-pink"></i>
+                                            <span>Sembunyikan dari katalog kasir POS</span>
+                                        </label>
+                                    </div>
+
+                                    {/* Variations Checkbox */}
+                                    <div className="flex items-center gap-2 py-1 bg-blue-light/30 border border-text/15 rounded-xl px-3">
+                                        <input 
+                                            type="checkbox" 
+                                            id="edit-has-variations" 
+                                            checked={editingProduct.hasVariations} 
+                                            onChange={(e) => setEditingProduct(prev => ({ 
+                                                ...prev, 
+                                                hasVariations: e.target.checked,
+                                                variationsList: prev.variationsList && prev.variationsList.length > 0 ? prev.variationsList : [{ name: '', price: '', stock: '10', discount: '0' }]
+                                            }))}
+                                            className="w-4 h-4 accent-pink border-2 border-text rounded cursor-pointer"
+                                        />
+                                        <label htmlFor="edit-has-variations" className="text-xs font-bold cursor-pointer select-none">
+                                            Memiliki variasi produk? (Contoh: Warna, Ukuran)
+                                        </label>
+                                    </div>
+
+                                    {/* Base Price & Stock (Only if NO variations) */}
+                                    {!editingProduct.hasVariations && (
+                                        <div className="bg-yellow-light/20 border-2 border-text/15 rounded-xl p-3 flex flex-col gap-2.5 mt-1">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[10px] font-bold uppercase text-text/80">Harga (Rp)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        required={!editingProduct.hasVariations}
+                                                        value={editingProduct.price}
+                                                        onChange={(e) => setEditingProduct(prev => ({ ...prev, price: e.target.value }))}
+                                                        className="border-2 border-text rounded-xl p-2 text-xs outline-none bg-white font-bold"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[10px] font-bold uppercase text-text/80">Stok</label>
+                                                    <input 
+                                                        type="number" 
+                                                        required={!editingProduct.hasVariations}
+                                                        min="0"
+                                                        value={editingProduct.stock}
+                                                        onChange={(e) => setEditingProduct(prev => ({ ...prev, stock: e.target.value }))}
+                                                        className="border-2 border-text rounded-xl p-2 text-xs outline-none bg-white font-bold"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[10px] font-bold uppercase text-pink">Diskon per Item (Rp)</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={editingProduct.discount}
+                                                    onChange={(e) => setEditingProduct(prev => ({ ...prev, discount: e.target.value }))}
+                                                    className="border-2 border-pink/60 rounded-xl p-2 text-xs outline-none bg-white font-bold"
+                                                />
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                                </>
-                            ) : (
-                                /* Variations dynamic lists */
-                                <div className="bg-blue-light/10 border-2 border-text rounded-xl p-3 flex flex-col gap-2 shadow-[2px_2px_0px_#181818] shrink-0">
-                                    <h5 className="font-title text-[10px] font-bold text-text flex justify-between items-center border-b border-text/15 pb-1">
-                                        <span>Daftar Variasi Item</span>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleAddEditVariationRow}
-                                            className="text-[9px] bg-blue-light text-text border-2 border-text px-2 py-0.5 rounded-full hover:bg-white font-bold cursor-pointer transition-all"
-                                        >
-                                            + Tambah Variasi
-                                        </button>
-                                    </h5>
 
-                                    <div className="max-h-[140px] overflow-y-auto flex flex-col gap-2 pr-1">
-                                        {editingProduct.variationsList.map((row, idx) => (
-                                            <div key={idx} className="flex flex-col gap-1.5 bg-white border border-text/10 rounded-lg p-2 relative">
-                                                <div className="flex gap-2 items-center">
-                                                    <div className="flex flex-col gap-0.5 flex-grow">
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder="Nama" 
-                                                            required={editingProduct.hasVariations}
-                                                            value={row.name}
-                                                            onChange={(e) => handleEditVariationRowChange(idx, 'name', e.target.value)}
-                                                            className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
-                                                        />
-                                                    </div>
-
-                                                    <div className="flex flex-col gap-0.5 w-[70px]">
-                                                        <input 
-                                                            type="number" 
-                                                            placeholder="Harga" 
-                                                            required={editingProduct.hasVariations}
-                                                            value={row.price}
-                                                            onChange={(e) => handleEditVariationRowChange(idx, 'price', e.target.value)}
-                                                            className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
-                                                        />
-                                                    </div>
-
-                                                    <div className="flex flex-col gap-0.5 w-[55px]">
-                                                        <input 
-                                                            type="number" 
-                                                            placeholder="Stok" 
-                                                            required={editingProduct.hasVariations}
-                                                            value={row.stock}
-                                                            onChange={(e) => handleEditVariationRowChange(idx, 'stock', e.target.value)}
-                                                            className="border-2 border-text rounded-lg p-1 text-[11px] outline-none bg-white font-bold"
-                                                        />
-                                                    </div>
-
-                                                    {editingProduct.variationsList.length > 1 && (
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => handleRemoveEditVariationRow(idx)}
-                                                            className="text-pink hover:scale-115 cursor-pointer ml-1 p-0.5"
-                                                            title="Hapus Baris"
-                                                        >
-                                                            <i className="fa-solid fa-xmark text-[12px]"></i>
-                                                        </button>
-                                                    )}
+                                {/* Right Column: Dedicated Wide Variations Workspace */}
+                                <div className="flex flex-col gap-2">
+                                    {editingProduct.hasVariations ? (
+                                        <div className="bg-blue-light/15 border-2 border-text rounded-2xl p-4 flex flex-col gap-3 shadow-[2px_2px_0px_#181818] h-full">
+                                            <div className="flex justify-between items-center border-b border-text/15 pb-2">
+                                                <div>
+                                                    <h5 className="font-title text-sm font-bold text-text flex items-center gap-1.5">
+                                                        <i className="fa-solid fa-layer-group text-blue"></i>
+                                                        <span>Daftar Variasi Item</span>
+                                                    </h5>
+                                                    <span className="text-[10px] text-text/60">Atur harga, stok, dan diskon untuk masing-masing opsi.</span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 pl-0.5">
-                                                    <i className="fa-solid fa-tag text-[8px] text-pink"></i>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="Diskon (Rp)" 
-                                                        min="0"
-                                                        value={row.discount}
-                                                        onChange={(e) => handleEditVariationRowChange(idx, 'discount', e.target.value)}
-                                                        className="border-2 border-pink/40 rounded-lg p-0.5 text-[10px] outline-none bg-pink-light/15 font-bold w-[90px] focus:border-pink"
-                                                    />
-                                                    {parseFloat(row.discount || 0) > 0 && parseFloat(row.price || 0) > 0 && (
-                                                        <span className="text-[9px] text-pink font-bold">→ {formatPrice(Math.max(0, parseFloat(row.price) - parseFloat(row.discount)))}</span>
-                                                    )}
-                                                </div>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={handleAddEditVariationRow}
+                                                    className="btn bg-blue-light text-text border-2 border-text px-3 py-1 rounded-full text-xs font-title font-bold hover:bg-white shadow-[1.5px_1.5px_0px_#181818] transition-all cursor-pointer"
+                                                >
+                                                    + Tambah Opsi
+                                                </button>
                                             </div>
-                                        ))}
-                                    </div>
+
+                                            <div className="overflow-y-auto max-h-[380px] flex flex-col gap-2.5 pr-1">
+                                                {editingProduct.variationsList.map((row, idx) => (
+                                                    <div key={idx} className="bg-white border-2 border-text/20 rounded-xl p-3 flex flex-col gap-2 shadow-[1.5px_1.5px_0px_#181818]">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex-grow">
+                                                                <label className="text-[9px] font-bold uppercase text-text/60 block mb-0.5">Nama Opsi</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    placeholder="e.g. Putih / Ukuran L" 
+                                                                    required={editingProduct.hasVariations}
+                                                                    value={row.name}
+                                                                    onChange={(e) => handleEditVariationRowChange(idx, 'name', e.target.value)}
+                                                                    className="w-full border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-bold"
+                                                                />
+                                                            </div>
+
+                                                            <div className="w-[110px]">
+                                                                <label className="text-[9px] font-bold uppercase text-text/60 block mb-0.5">Harga (Rp)</label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    required={editingProduct.hasVariations}
+                                                                    value={row.price}
+                                                                    onChange={(e) => handleEditVariationRowChange(idx, 'price', e.target.value)}
+                                                                    className="w-full border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-title font-bold"
+                                                                />
+                                                            </div>
+
+                                                            <div className="w-[85px]">
+                                                                <label className="text-[9px] font-bold uppercase text-text/60 block mb-0.5">Stok</label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    required={editingProduct.hasVariations}
+                                                                    value={row.stock}
+                                                                    onChange={(e) => handleEditVariationRowChange(idx, 'stock', e.target.value)}
+                                                                    className="w-full border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-bold"
+                                                                />
+                                                            </div>
+
+                                                            {editingProduct.variationsList.length > 1 && (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveEditVariationRow(idx)}
+                                                                    className="text-pink hover:scale-115 cursor-pointer mt-4 p-1"
+                                                                    title="Hapus Opsi"
+                                                                >
+                                                                    <i className="fa-solid fa-trash-can text-sm"></i>
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 border-t border-dashed border-text/15 pt-1.5 text-xs">
+                                                            <i className="fa-solid fa-tag text-[10px] text-pink"></i>
+                                                            <input 
+                                                                type="number" 
+                                                                placeholder="Diskon khusus (Rp)" 
+                                                                min="0"
+                                                                value={row.discount}
+                                                                onChange={(e) => handleEditVariationRowChange(idx, 'discount', e.target.value)}
+                                                                className="border border-pink/40 rounded-md p-1 text-[11px] outline-none bg-pink-light/15 font-bold w-[120px]"
+                                                            />
+                                                            {parseFloat(row.discount || 0) > 0 && parseFloat(row.price || 0) > 0 && (
+                                                                <span className="text-[11px] text-pink font-bold">
+                                                                    → {formatPrice(Math.max(0, parseFloat(row.price) - parseFloat(row.discount)))}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="border-2 border-dashed border-text/25 rounded-2xl p-6 flex flex-col items-center justify-center text-center h-full bg-yellow-light/15 text-text/60">
+                                            <i className="fa-solid fa-layer-group text-3xl mb-2 text-text/40"></i>
+                                            <h6 className="font-title text-sm font-bold text-text">Item Tunggal (Tanpa Variasi)</h6>
+                                            <p className="text-xs text-text/70 mt-1 max-w-xs font-body">Centang opsi "Memiliki variasi produk" di sebelah kiri jika produk ini memiliki pilihan model, warna, atau ukuran.</p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
 
                             {/* Modal actions */}
-                            <div className="grid grid-cols-2 gap-3 mt-3">
+                            <div className="flex justify-end gap-3 mt-4 pt-3 border-t-2 border-text/10 shrink-0">
                                 <button 
                                     type="button" 
                                     onClick={() => setEditingProduct(null)}
-                                    className="btn bg-white text-text border-[3px] border-text rounded-full font-title text-[12px] px-4 py-2 shadow-btn hover:bg-text/5 cursor-pointer"
+                                    className="btn bg-white text-text border-2 border-text rounded-full font-title text-xs px-5 py-2.5 shadow-[2px_2px_0px_#181818] hover:bg-yellow-light cursor-pointer font-bold"
                                 >
                                     Batal
                                 </button>
                                 <button 
                                     type="submit" 
-                                    className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[12px] px-4 py-2 shadow-btn hover:bg-white cursor-pointer"
+                                    className="btn bg-pink text-text border-[2.5px] border-text rounded-full font-title text-xs px-6 py-2.5 shadow-[2.5px_2.5px_0px_#181818] hover:bg-white active:translate-y-[1px] active:shadow-none cursor-pointer font-bold"
                                 >
                                     Simpan Perubahan
                                 </button>

@@ -1235,7 +1235,7 @@ export const sp_import_bundles_batch = async (bundlesList) => {
 export const trg_check_stock_depletion = async () => {
     const products = await getProducts();
     const depleted = products.filter(p => (p.stock || 0) <= 0);
-    const lowStock = products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < 10);
+    const lowStock = products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) <= 5);
     return {
         depletedCount: depleted.length,
         depletedItems: depleted.map(p => ({ id: p.id, name: p.name, stock: p.stock })),

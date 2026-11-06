@@ -17,7 +17,7 @@ export default function ProductCardMobile({
     formatPrice,
     getCategoryDisplayLabel
 }) {
-    const isLowStock = product.stock < 10;
+    const isLowStock = product.stock <= 5;
     const hasVars = product.variations && product.variations.length > 0;
 
     return (
