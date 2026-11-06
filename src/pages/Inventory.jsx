@@ -997,7 +997,17 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                     />
                                 </div>
                                 <div className="flex flex-col gap-1.5">
-                                    <label className="text-[12px] font-bold uppercase">{t.stock || "Stok"}</label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[12px] font-bold uppercase">{t.stock || "Stok"}</label>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setStock('0')}
+                                            className="text-[10px] bg-yellow-light hover:bg-yellow border border-text rounded-md px-1.5 py-0.2 font-tag font-extrabold cursor-pointer transition-all shadow-[1px_1px_0px_#181818]"
+                                            title="Set stok ke 0"
+                                        >
+                                            Set 0
+                                        </button>
+                                    </div>
                                     <input 
                                         type="number" 
                                         required={!hasVariations}
@@ -1014,13 +1024,23 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                 <div className="flex flex-col gap-2 border-b border-text/15 pb-2.5">
                                     <div className="flex justify-between items-center">
                                         <h5 className="font-title text-[12px] font-bold text-text">Daftar Variasi Item</h5>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleAddVariationRow}
-                                            className="text-[11px] bg-blue-light text-text border-2 border-text px-2.5 py-0.5 rounded-full hover:bg-white font-bold cursor-pointer transition-all shadow-[1px_1px_0px_#181818]"
-                                        >
-                                            + Tambah Variasi
-                                        </button>
+                                        <div className="flex items-center gap-1.5">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setVariationsList(prev => prev.map(v => ({ ...v, stock: '0' })))}
+                                                className="text-[10px] bg-yellow-light hover:bg-yellow text-text border border-text px-2 py-0.5 rounded-full font-tag font-extrabold cursor-pointer transition-all shadow-[1px_1px_0px_#181818]"
+                                                title="Set semua stok opsi ke 0"
+                                            >
+                                                Stok 0 Semua
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={handleAddVariationRow}
+                                                className="text-[11px] bg-blue-light text-text border-2 border-text px-2.5 py-0.5 rounded-full hover:bg-white font-bold cursor-pointer transition-all shadow-[1px_1px_0px_#181818]"
+                                            >
+                                                + Tambah Variasi
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Pricing Mode Toggle */}
@@ -1847,7 +1867,17 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                     />
                                                 </div>
                                                 <div className="flex flex-col gap-1">
-                                                    <label className="text-[10px] font-bold uppercase text-text/80">Stok</label>
+                                                    <div className="flex justify-between items-center">
+                                                        <label className="text-[10px] font-bold uppercase text-text/80">Stok</label>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => setEditingProduct(prev => ({ ...prev, stock: '0' }))}
+                                                            className="text-[9px] bg-yellow-light hover:bg-yellow border border-text rounded px-1.5 py-0.2 font-tag font-extrabold cursor-pointer transition-all shadow-[1px_1px_0px_#181818]"
+                                                            title="Set stok ke 0"
+                                                        >
+                                                            Set 0
+                                                        </button>
+                                                    </div>
                                                     <input 
                                                         type="number" 
                                                         required={!editingProduct.hasVariations}
@@ -1885,13 +1915,26 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                     </h5>
                                                     <span className="text-[10px] text-text/60">Atur harga, stok, dan diskon untuk masing-masing opsi.</span>
                                                 </div>
-                                                <button 
-                                                    type="button" 
-                                                    onClick={handleAddEditVariationRow}
-                                                    className="btn bg-blue-light text-text border-2 border-text px-3 py-1 rounded-full text-xs font-title font-bold hover:bg-white shadow-[1.5px_1.5px_0px_#181818] transition-all cursor-pointer"
-                                                >
-                                                    + Tambah Opsi
-                                                </button>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => setEditingProduct(prev => ({
+                                                            ...prev,
+                                                            variationsList: prev.variationsList.map(v => ({ ...v, stock: '0' }))
+                                                        }))}
+                                                        className="text-[10px] bg-yellow-light hover:bg-yellow text-text border border-text px-2.5 py-1 rounded-full font-tag font-extrabold cursor-pointer transition-all shadow-[1px_1px_0px_#181818]"
+                                                        title="Set semua stok opsi ke 0"
+                                                    >
+                                                        Stok 0 Semua
+                                                    </button>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={handleAddEditVariationRow}
+                                                        className="btn bg-blue-light text-text border-2 border-text px-3 py-1 rounded-full text-xs font-title font-bold hover:bg-white shadow-[1.5px_1.5px_0px_#181818] transition-all cursor-pointer"
+                                                    >
+                                                        + Tambah Opsi
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {/* Pricing Mode Toggle for Edit Modal */}
