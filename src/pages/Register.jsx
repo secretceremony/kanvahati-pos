@@ -483,16 +483,17 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
             <div className={`catalog-panel flex flex-col h-auto min-h-[400px] bg-white border-[2.5px] border-text rounded-2xl shadow-card overflow-hidden ${activeMobileTab === 'catalog' ? 'block' : 'hidden lg:flex'}`}>
                 {/* Retro Window Header */}
                 <div className="retro-window-header">
-                    <div className="retro-dots">
+                    <div className="retro-dots hidden sm:flex">
                         <span className="retro-dot retro-dot-red"></span>
                         <span className="retro-dot retro-dot-yellow"></span>
                         <span className="retro-dot retro-dot-blue"></span>
                         <span className="font-tag text-[9.5px] font-black uppercase tracking-wider text-text ml-1">Katalog Barang</span>
                     </div>
-                    <span className="text-[10px] font-tag font-bold opacity-75">{filteredProducts.length} Items</span>
+                    <span className="sm:hidden font-tag text-[10px] font-black uppercase tracking-wider text-text">Katalog Barang</span>
+                    <span className="text-[10px] font-tag font-bold opacity-75">{filteredProducts.length} PRODUK</span>
                 </div>
 
-                <div className="p-4 flex flex-col flex-grow">
+                <div className="p-3 sm:p-4 flex flex-col flex-grow">
                 <div className="catalog-controls flex flex-col gap-3 mb-4 shrink-0">
                     <div className="search-box relative flex items-center">
                         <i className="fa-solid fa-magnifying-glass absolute left-3.5 text-text"></i>
@@ -501,7 +502,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder={t.searchPlaceholder}
-                            className="w-full font-body border-2 border-text rounded-xl py-2 pl-10 pr-4 text-sm text-text outline-none focus:bg-yellow-light/40"
+                            className="w-full font-body border-2 border-text rounded-xl py-2 pl-10 pr-4 text-sm text-text placeholder:text-gray-600 placeholder:font-medium outline-none focus:bg-yellow-light/40"
                         />
                     </div>
                     
@@ -581,6 +582,10 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                                     </>
                                                 )}
                                             </span>
+                                            <span className="bg-white border-2 border-text rounded-lg px-2 py-1 text-[10px] font-title font-bold text-text shadow-[1.5px_1.5px_0px_#181818] flex items-center gap-1 group-hover:bg-yellow">
+                                                <i className="fa-solid fa-plus text-[9px] text-pink"></i>
+                                                <span className="hidden sm:inline">Pilih</span>
+                                            </span>
                                         </div>
                                     </div>
                                 );
@@ -595,13 +600,14 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
             <div className={`ticket-panel flex flex-col h-auto min-h-[450px] bg-white border-[3px] border-text rounded-2xl shadow-pop overflow-hidden ${activeMobileTab === 'cart' ? 'block' : 'hidden lg:flex'}`}>
                 {/* Retro Window Header for Ticket */}
                 <div className="retro-window-header bg-yellow border-b-[2.5px] border-text px-3.5 py-2 flex items-center justify-between">
-                    <div className="retro-dots flex items-center gap-1.5">
+                    <div className="retro-dots hidden sm:flex items-center gap-1.5">
                         <span className="retro-dot retro-dot-red"></span>
                         <span className="retro-dot retro-dot-yellow"></span>
                         <span className="retro-dot retro-dot-blue"></span>
                         <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Pesanan Aktif</span>
                     </div>
-                    <span className="text-[10px] font-tag font-black uppercase bg-white border border-text px-2 py-0.5 rounded shadow-[1px_1px_0px_#171717]">{ticket.length} Macam</span>
+                    <span className="sm:hidden font-tag text-[10px] font-black uppercase tracking-wider text-text">Pesanan Aktif</span>
+                    <span className="text-[10px] font-tag font-black uppercase bg-white border border-text px-2 py-0.5 rounded shadow-[1px_1px_0px_#171717]">{totals.qty} PRODUK</span>
                 </div>
 
                 <div className="p-4 flex flex-col flex-grow bg-[#FFFDF9]">
@@ -612,7 +618,12 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                     </h3>
                     <button 
                         onClick={handleClearTicket}
-                        className="btn-clear-ticket bg-white border-[1.5px] border-text rounded-md px-2 py-1 text-text font-tag text-[10px] font-black uppercase cursor-pointer flex items-center gap-1 hover:bg-pink hover:text-white transition-all shadow-[1px_1px_0px_#171717]"
+                        disabled={ticket.length === 0}
+                        className={`btn-clear-ticket border-[1.5px] rounded-md px-2 py-1 font-tag text-[10px] font-black uppercase flex items-center gap-1 transition-all ${
+                            ticket.length === 0
+                                ? 'bg-gray-100 text-gray-400 border-gray-300 opacity-60 cursor-not-allowed select-none shadow-none'
+                                : 'bg-white border-text text-text cursor-pointer hover:bg-pink hover:text-white shadow-[1px_1px_0px_#171717]'
+                        }`}
                     >
                         <i className="fa-solid fa-trash-can"></i> {t.clear}
                     </button>
@@ -726,7 +737,12 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
                     <button 
                         onClick={handleCheckoutPress}
-                        className="btn btn-primary btn-block bg-pink text-text border-[2.5px] border-text rounded-xl font-tag text-[13px] font-black uppercase tracking-wider px-6 py-3 shadow-[3px_3px_0px_#171717] hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#171717] active:translate-y-[1px] active:shadow-[1px_1px_0px_#171717] transition-all cursor-pointer flex items-center justify-center gap-2 w-full"
+                        disabled={ticket.length === 0 || totals.total <= 0}
+                        className={`btn btn-primary btn-block border-[2.5px] border-text rounded-xl font-tag text-[13px] font-black uppercase tracking-wider px-6 py-3 transition-all flex items-center justify-center gap-2 w-full ${
+                            ticket.length === 0 || totals.total <= 0
+                                ? 'bg-gray-200 text-gray-400 border-gray-400 opacity-60 cursor-not-allowed select-none shadow-none'
+                                : 'bg-pink text-text shadow-[3px_3px_0px_#171717] hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#171717] active:translate-y-[1px] active:shadow-[1px_1px_0px_#171717] cursor-pointer'
+                        }`}
                     >
                         <span>{t.process} 🛒</span>
                     </button>

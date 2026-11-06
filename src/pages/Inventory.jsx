@@ -1035,29 +1035,35 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                 <span>📋 Daftar Kategori Saat Ini</span>
                             </h5>
                             <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 pr-1">
-                                {categories.map(cat => (
-                                    <div key={cat} className="flex justify-between items-center text-xs py-1 border-b border-dashed border-text/5">
-                                        <span className="font-bold text-text/90 capitalize">{getCategoryDisplayLabel(cat)}</span>
-                                        <div className="flex gap-2">
-                                            <button 
-                                                type="button"
-                                                onClick={() => handleEditCategory(cat)}
-                                                className="text-blue hover:scale-110 cursor-pointer p-0.5"
-                                                title="Ubah Kategori"
-                                            >
-                                                <i className="fa-solid fa-pen text-[10px]"></i>
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                onClick={() => handleDeleteCategory(cat)}
-                                                className="text-pink hover:scale-110 cursor-pointer p-0.5"
-                                                title="Hapus Kategori"
-                                            >
-                                                <i className="fa-solid fa-trash-can text-[10px]"></i>
-                                            </button>
-                                        </div>
+                                {categories.length === 0 ? (
+                                    <div className="text-center py-4 text-xs font-bold text-text/50 border border-dashed border-text/20 rounded-lg bg-yellow-light/20">
+                                        <span>Belum ada kategori tersimpan. Tambahkan di bawah!</span>
                                     </div>
-                                ))}
+                                ) : (
+                                    categories.map(cat => (
+                                        <div key={cat} className="flex justify-between items-center text-xs py-1 border-b border-dashed border-text/5">
+                                            <span className="font-bold text-text/90 capitalize">{getCategoryDisplayLabel(cat)}</span>
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleEditCategory(cat)}
+                                                    className="text-blue hover:scale-110 cursor-pointer p-0.5"
+                                                    title="Ubah Kategori"
+                                                >
+                                                    <i className="fa-solid fa-pen text-[10px]"></i>
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleDeleteCategory(cat)}
+                                                    className="text-pink hover:scale-110 cursor-pointer p-0.5"
+                                                    title="Hapus Kategori"
+                                                >
+                                                    <i className="fa-solid fa-trash-can text-[10px]"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
 
@@ -1247,10 +1253,10 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                 </div>
                                             )}
 
-                                            <div className="flex gap-2 pt-2 border-t border-dashed border-text/20">
+                                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-2 border-t border-dashed border-text/20">
                                                 <button 
                                                     onClick={() => handleToggleCatalogueVisibility(prod)}
-                                                    className={`btn flex-1 border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold ${
+                                                    className={`btn w-full sm:w-auto sm:flex-1 border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold ${
                                                         prod.hiddenFromCatalogue ? 'bg-pink text-text' : 'bg-yellow text-text'
                                                     }`}
                                                     title={prod.hiddenFromCatalogue ? "Tampilkan di katalog POS" : "Sembunyikan dari katalog POS"}
@@ -1261,22 +1267,24 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                 {!hasVars && (
                                                     <button 
                                                         onClick={() => handleRestockClick(prod)}
-                                                        className="btn flex-1 bg-blue-light text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                        className="btn w-full sm:w-auto sm:flex-1 bg-blue-light text-text border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
                                                     >
                                                         <i className="fa-solid fa-box-open"></i> +Stok
                                                     </button>
                                                 )}
                                                 <button 
                                                     onClick={() => handleOpenEditModal(prod)}
-                                                    className="btn flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
+                                                    className="btn w-full sm:w-auto sm:flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
                                                 >
                                                     <i className="fa-solid fa-pen"></i> Edit
                                                 </button>
                                                 <button 
                                                     onClick={() => handleDelete(prod.id)}
-                                                    className="btn bg-white text-rose-700 border-2 border-text rounded-full px-3 py-1 font-title text-[11px] shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1"
+                                                    className="btn w-full sm:w-auto bg-white text-rose-700 border-2 border-text rounded-full px-4 py-1.5 font-title text-[11px] shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 hover:bg-rose-50"
+                                                    title="Hapus produk"
                                                 >
                                                     <i className="fa-solid fa-trash"></i>
+                                                    <span className="sm:hidden font-bold">Hapus</span>
                                                 </button>
                                             </div>
                                         </div>

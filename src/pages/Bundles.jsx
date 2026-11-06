@@ -337,13 +337,14 @@ export default function Bundles({ showToast, currentUser, userRole }) {
         <div className="bundles-layout lg:h-full h-auto p-4 md:p-6 bg-white border-[3px] border-text rounded-2xl shadow-pop relative overflow-hidden">
             {/* Retro Window Header */}
             <div className="retro-window-header -mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-5 bg-pink border-b-[2.5px] border-text px-4 py-2 flex items-center justify-between">
-                <div className="retro-dots flex items-center gap-1.5">
+                <div className="retro-dots hidden sm:flex items-center gap-1.5">
                     <span className="retro-dot retro-dot-red"></span>
                     <span className="retro-dot retro-dot-yellow"></span>
                     <span className="retro-dot retro-dot-blue"></span>
                     <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Paket Promosi</span>
                 </div>
-                <span className="text-[10px] font-tag font-black uppercase bg-yellow px-2 py-0.5 rounded border border-text shadow-[1px_1px_0px_#171717]">{bundles.length} Bundle</span>
+                <span className="sm:hidden font-tag text-[10px] font-black uppercase tracking-wider text-text">Paket Promosi</span>
+                <span className="text-[10px] font-tag font-black uppercase bg-yellow px-2 py-0.5 rounded border border-text shadow-[1px_1px_0px_#171717]">{bundles.length} BUNDLE</span>
             </div>
             
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -352,45 +353,58 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                     <p className="text-sm opacity-80 mt-1 font-body">Buat paket promosi yang otomatis muncul di terminal kasir.</p>
                 </div>
                 
-                {/* Bundle Action Toolbar: CSV Import, XLSX Template, Add Bundle */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <label 
-                        className="btn bg-pink text-text border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center gap-1.5 cursor-pointer"
-                        title="Import bundle via file CSV"
-                    >
-                        <i className="fa-solid fa-file-csv"></i> Import CSV
-                        <input 
-                            type="file" 
-                            accept=".csv" 
-                            onChange={handleCsvFileUpload} 
-                            className="hidden" 
-                        />
-                    </label>
-
-                    <button 
-                        type="button"
-                        onClick={handleDownloadBundlesTemplate}
-                        className="btn bg-yellow text-text border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center gap-1.5 cursor-pointer"
-                        title="Unduh format spreadsheet bundle .xlsx"
-                    >
-                        <i className="fa-solid fa-file-excel"></i> Template XLSX
-                    </button>
-
+                {/* Bundle Action Toolbar: Responsive Layout with Primary Button Prominence */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                     <button 
                         onClick={() => handleOpenModal()}
-                        className="btn bg-blue-light text-text border-[2.5px] border-text rounded-full font-title text-[13px] px-4 py-1.5 shadow-btn hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 font-bold"
+                        className="btn bg-pink text-text border-[2.5px] border-text rounded-full font-title text-[13px] px-5 py-2.5 shadow-[3px_3px_0px_#181818] hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#181818] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer flex items-center justify-center gap-2 font-bold order-1 sm:order-2"
                     >
                         <i className="fa-solid fa-plus"></i> {t.addBundle}
                     </button>
+
+                    <div className="grid grid-cols-2 gap-2 order-2 sm:order-1">
+                        <label 
+                            className="btn bg-white text-text border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-yellow-light hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            title="Import bundle via file CSV"
+                        >
+                            <i className="fa-solid fa-file-csv text-pink"></i> Import CSV
+                            <input 
+                                type="file" 
+                                accept=".csv" 
+                                onChange={handleCsvFileUpload} 
+                                className="hidden" 
+                            />
+                        </label>
+
+                        <button 
+                            type="button"
+                            onClick={handleDownloadBundlesTemplate}
+                            className="btn bg-yellow text-text border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            title="Unduh format spreadsheet bundle .xlsx"
+                        >
+                            <i className="fa-solid fa-file-excel"></i> Template
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {loading ? (
                 <div className="text-center py-12 font-bold text-text/60">Memuat Bundle...</div>
             ) : bundles.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-text/40 gap-3 border-2 border-dashed border-text/30 rounded-xl bg-blue-light/10">
-                    <i className="fa-solid fa-gift text-5xl"></i>
-                    <p className="font-bold">Belum ada bundle/promo yang dibuat.</p>
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-text/80 gap-3 border-[2.5px] border-dashed border-text rounded-2xl bg-yellow-light/20 shadow-[2px_2px_0px_#181818] max-w-lg mx-auto my-6 text-center">
+                    <div className="w-14 h-14 rounded-full bg-pink-light border-2 border-text flex items-center justify-center text-pink text-2xl shadow-[2px_2px_0px_#181818]">
+                        <i className="fa-solid fa-gift"></i>
+                    </div>
+                    <div>
+                        <h4 className="font-title text-base font-bold text-text">Belum ada promo bundle yang dibuat</h4>
+                        <p className="text-xs text-text/70 mt-1 max-w-xs font-body">Gabungkan beberapa item dengan harga diskon khusus untuk kasir.</p>
+                    </div>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="btn bg-pink text-text border-2 border-text rounded-full font-title text-xs px-4 py-2 font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all cursor-pointer mt-2"
+                    >
+                        + Buat Bundle Sekarang
+                    </button>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
