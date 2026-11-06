@@ -3,6 +3,7 @@ import { getBundles, saveBundle, deleteBundle, getProducts, sp_import_bundles_ba
 import * as XLSX from 'xlsx';
 import { recordAuditLog } from '../services/audit';
 import { t } from '../services/translations';
+import BundleCard from '../components/bundles/BundleCard';
 
 export default function Bundles({ showToast, currentUser, userRole }) {
     const [bundles, setBundles] = useState([]);
@@ -408,63 +409,17 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                    {bundles.map(bundle => {
-                        const originalPrice = calculateOriginalPrice(bundle.items);
-                        const discount = originalPrice - bundle.bundlePrice;
-                        
-                        return (
-                            <div key={bundle.id} className={`bundle-card border-[3px] border-text rounded-2xl p-5 relative transition-all flex flex-col ${bundle.isActive ? 'bg-white shadow-[6px_6px_0px_#181818]' : 'bg-gray-100 opacity-60'}`}>
-                                {!bundle.isActive && (
-                                    <div className="absolute top-2 right-2 bg-text text-white text-[10px] font-bold px-2 py-1 rounded-full">{t.inactive}</div>
-                                )}
-                                <h3 className="font-title text-xl text-text leading-tight mb-2 pr-12">{bundle.name}</h3>
-                                
-                                <div className="mb-4">
-                                    <span className="text-xs opacity-60 line-through mr-2">{formatMoney(originalPrice)}</span>
-                                    <span className="font-bold text-pink text-lg">{formatMoney(bundle.bundlePrice)}</span>
-                                    {discount > 0 && (
-                                        <div className="inline-block ml-2 bg-yellow-light border-2 border-text text-[10px] font-bold px-2 py-0.5 rounded-full transform -rotate-2">
-                                            HEMAT {formatMoney(discount)}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="bg-blue-light/30 border-2 border-text/20 rounded-xl p-3 mb-4 flex-grow">
-                                    <h4 className="text-[11px] font-bold uppercase mb-2 opacity-80">{t.bundleItems}:</h4>
-                                    <ul className="text-sm space-y-1">
-                                        {bundle.items.map((item, idx) => {
-                                            const prod = products.find(p => p.id === item.productId);
-                                            return (
-                                                <li key={idx} className="flex items-start gap-2">
-                                                    <i className="fa-solid fa-check text-pink mt-1 text-[10px]"></i>
-                                                    <span className="flex-grow">
-                                                        {prod ? prod.name : 'Produk Dihapus'} 
-                                                        {item.variationName && <span className="text-xs opacity-70 ml-1">({item.variationName})</span>}
-                                                    </span>
-                                                    <span className="font-bold">x{item.qty}</span>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                </div>
-
-                                <div className="flex gap-2 mt-auto">
-                                    <button 
-                                        onClick={() => handleOpenModal(bundle)}
-                                        className="flex-1 bg-blue-light border-2 border-text rounded-full py-1.5 text-xs font-bold shadow-[2px_2px_0px_#181818] hover:bg-white transition-colors cursor-pointer"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(bundle.id)}
-                                        className="bg-white text-pink border-2 border-text rounded-full px-3 py-1.5 text-xs shadow-[2px_2px_0px_#181818] hover:bg-pink-light transition-colors cursor-pointer"
-                                    >
-                                        <i className="fa-solid fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
+                    {bundles.map(bundle => (
+                        <BundleCard 
+                            key={bundle.id}
+                            bundle={bundle}
+                            products={products}
+                            onEdit={() => handleOpenModal(bundle)}
+                            onDelete={() => handleDelete(bundle.id)}
+                            calculateOriginalPrice={calculateOriginalPrice}
+                            formatMoney={formatMoney}
+                        />
+                    ))}
                 </div>
             )}
 

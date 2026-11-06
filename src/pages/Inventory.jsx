@@ -14,6 +14,7 @@ import {
 import * as XLSX from 'xlsx';
 import { recordAuditLog } from '../services/audit';
 import { t } from '../services/translations';
+import ProductCardMobile from '../components/inventory/ProductCardMobile';
 
 export default function Inventory({ showToast, currentUser, userRole }) {
     const [products, setProducts] = useState([]);
@@ -1163,133 +1164,35 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                     </div>
                 )}
 
-                <div className="table-container flex-grow overflow-y-auto max-h-[600px]">
+                <div className="table-container flex-grow overflow-y-auto max-h-[600px] lg:max-h-[650px] pb-10 pr-0.5">
                     {loading ? (
                         <div className="text-center py-12 font-bold text-text/60">{t.loadingProducts}</div>
                     ) : (
                         <>
                             {/* 1. Mobile Card List (< lg) */}
                             <div className="block lg:hidden space-y-3">
-                                {products.map(prod => {
-                                    const isLowStock = prod.stock < 10;
-                                    const hasVars = prod.variations && prod.variations.length > 0;
-                                    const isExpanded = expandedProductId === prod.id;
-
-                                    return (
-                                        <div key={prod.id} className={`border-2 border-text rounded-xl p-3.5 shadow-[2px_2px_0px_#181818] flex flex-col gap-2 ${
-                                            isLowStock ? 'bg-pink-light/30' : 'bg-yellow-light/20'
-                                        }`}>
-                                            <div className="flex justify-between items-start gap-2 border-b border-dashed border-text/20 pb-2">
-                                                <div className="flex items-start gap-2">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={selectedProducts.includes(prod.id)} 
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedProducts(prev => [...prev, prod.id]);
-                                                            } else {
-                                                                setSelectedProducts(prev => prev.filter(id => id !== prod.id));
-                                                            }
-                                                        }}
-                                                        className="w-4 h-4 cursor-pointer accent-pink mt-0.5"
-                                                    />
-                                                    <div>
-                                                        <span className="font-mono text-[10px] font-bold opacity-60 block">{prod.id}</span>
-                                                        <h4 className="font-title font-bold text-sm text-text leading-tight mt-0.5">{prod.name}</h4>
-                                                    </div>
-                                                </div>
-                                                <span className={`px-2 py-0.5 rounded-full font-title text-[10px] font-bold border border-text shrink-0 ${
-                                                    isLowStock ? 'bg-rose-200 text-rose-800' : 'bg-green-100 text-green-800'
-                                                }`}>
-                                                    Stok: {prod.stock}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex justify-between items-center text-xs">
-                                                <div>
-                                                    <span className="text-[10px] opacity-60 uppercase block font-bold">Harga</span>
-                                                    <span className="font-title font-bold text-sm text-pink">
-                                                        {formatPrice(hasVars ? Math.min(...prod.variations.map(v => v.price)) : prod.price)}
-                                                        {hasVars && <span className="text-[9px] block font-body opacity-70 font-normal">(Mulai dari)</span>}
-                                                    </span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="text-[10px] opacity-60 uppercase block font-bold">Kategori</span>
-                                                    <span className="font-bold text-xs">{getCategoryDisplayLabel(prod.category)}</span>
-                                                </div>
-                                            </div>
-
-                                            {hasVars && (
-                                                <div className="bg-white/80 border border-text rounded-lg p-2.5 mt-1">
-                                                    <div 
-                                                        onClick={() => setExpandedProductId(isExpanded ? null : prod.id)}
-                                                        className="flex justify-between items-center cursor-pointer text-xs font-title font-bold text-blue"
-                                                    >
-                                                        <span>{prod.variations.length} Variasi Tersedia</span>
-                                                        <i className={`fa-solid fa-chevron-down transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
-                                                    </div>
-                                                    {isExpanded && (
-                                                        <div className="divide-y divide-text/10 mt-2 pt-1">
-                                                            {prod.variations.map((v, i) => (
-                                                                <div key={i} className="py-2 flex justify-between items-center text-[11.5px]">
-                                                                    <div className="flex flex-col">
-                                                                        <span className="font-bold">{v.name}</span>
-                                                                        <span className="font-mono text-pink">{formatPrice(v.price)}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="bg-yellow-light border border-text rounded px-2 py-0.5 font-mono text-[10px] font-bold">{v.stock} pcs</span>
-                                                                        <button 
-                                                                            onClick={() => handleRestockClick(prod, v.name)}
-                                                                            className="btn bg-blue-light text-text border border-text rounded px-2 py-0.5 text-[10px] font-bold shadow-[1px_1px_0px_#181818] active:translate-y-[1px]"
-                                                                            title="Tambah stok"
-                                                                        >
-                                                                            +Stok
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-2 border-t border-dashed border-text/20">
-                                                <button 
-                                                    onClick={() => handleToggleCatalogueVisibility(prod)}
-                                                    className={`btn w-full sm:w-auto sm:flex-1 border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold ${
-                                                        prod.hiddenFromCatalogue ? 'bg-pink text-text' : 'bg-yellow text-text'
-                                                    }`}
-                                                    title={prod.hiddenFromCatalogue ? "Tampilkan di katalog POS" : "Sembunyikan dari katalog POS"}
-                                                >
-                                                    <i className={`fa-solid ${prod.hiddenFromCatalogue ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-                                                    {prod.hiddenFromCatalogue ? 'Tersembunyi' : 'Katalog Aktif'}
-                                                </button>
-                                                {!hasVars && (
-                                                    <button 
-                                                        onClick={() => handleRestockClick(prod)}
-                                                        className="btn w-full sm:w-auto sm:flex-1 bg-blue-light text-text border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
-                                                    >
-                                                        <i className="fa-solid fa-box-open"></i> +Stok
-                                                    </button>
-                                                )}
-                                                <button 
-                                                    onClick={() => handleOpenEditModal(prod)}
-                                                    className="btn w-full sm:w-auto sm:flex-1 bg-white text-text border-2 border-text rounded-full font-title text-[11px] py-1.5 shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 font-bold"
-                                                >
-                                                    <i className="fa-solid fa-pen"></i> Edit
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDelete(prod.id)}
-                                                    className="btn w-full sm:w-auto bg-white text-rose-700 border-2 border-text rounded-full px-4 py-1.5 font-title text-[11px] shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] flex items-center justify-center gap-1 hover:bg-rose-50"
-                                                    title="Hapus produk"
-                                                >
-                                                    <i className="fa-solid fa-trash"></i>
-                                                    <span className="sm:hidden font-bold">Hapus</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                {products.map(prod => (
+                                    <ProductCardMobile
+                                        key={prod.id}
+                                        product={prod}
+                                        selected={selectedProducts.includes(prod.id)}
+                                        onSelect={(checked) => {
+                                            if (checked) {
+                                                setSelectedProducts(prev => [...prev, prod.id]);
+                                            } else {
+                                                setSelectedProducts(prev => prev.filter(id => id !== prod.id));
+                                            }
+                                        }}
+                                        onRestock={(varName) => handleRestockClick(prod, varName)}
+                                        onEdit={() => handleOpenEditModal(prod)}
+                                        onDelete={() => handleDelete(prod.id)}
+                                        onToggleVisibility={() => handleToggleCatalogueVisibility(prod)}
+                                        expanded={expandedProductId === prod.id}
+                                        onToggleExpand={() => setExpandedProductId(expandedProductId === prod.id ? null : prod.id)}
+                                        formatPrice={formatPrice}
+                                        getCategoryDisplayLabel={getCategoryDisplayLabel}
+                                    />
+                                ))}
                             </div>
 
                             {/* 2. Desktop Table (>= lg) */}
