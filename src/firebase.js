@@ -1,7 +1,11 @@
 // --- Firebase Initialization ---
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { 
+    initializeFirestore, 
+    persistentLocalCache, 
+    persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 // Read environment config (supports Vite import.meta.env and Node process.env for tests)
 const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' ? process.env : {});
@@ -17,5 +21,24 @@ export const firebaseConfig = {
 
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app);
+
+// Use persistent multi-tab IndexedDB cache in browser environments, fallback in node/tests
+let firestoreDb;
+try {
+    if (typeof window !== 'undefined') {
+        firestoreDb = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager()
+            })
+        });
+    } else {
+        const { getFirestore } = await import("firebase/firestore");
+        firestoreDb = getFirestore(app);
+    }
+} catch (e) {
+    const { getFirestore } = await import("firebase/firestore");
+    firestoreDb = getFirestore(app);
+}
+
+export const db = firestoreDb;
 export const auth = getAuth(app);

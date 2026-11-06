@@ -26,14 +26,14 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     // Mobile layout toggle state
     const [activeMobileTab, setActiveMobileTab] = useState('catalog');
 
-    // Fetch products and categories list from DB Layer
-    const fetchData = async () => {
+    // Fetch products and categories list from DB Layer (utilizes in-memory and persistent cache)
+    const fetchData = async (forceRefetch = false) => {
         try {
             setLoading(true);
             const [prodsData, catsData, bundlesData] = await Promise.all([
-                getProducts(),
-                getCategories(),
-                getBundles()
+                getProducts(forceRefetch),
+                getCategories(forceRefetch),
+                getBundles(forceRefetch)
             ]);
             setProducts(prodsData);
             setCategories(catsData);

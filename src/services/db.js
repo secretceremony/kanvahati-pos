@@ -1,6 +1,6 @@
 // --- Unified Data Layer with In-Memory Caching (Firestore & LocalStorage Fallback) ---
 import { db } from '../firebase';
-import { collection, getDocs, setDoc, doc, deleteDoc, writeBatch, runTransaction, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, setDoc, doc, deleteDoc, writeBatch, runTransaction, query, orderBy, limit } from 'firebase/firestore';
 
 // Initial Product Data (All natively in IDR Rupiah)
 const initialProducts = [
@@ -428,8 +428,8 @@ export const updateProductStock = async (productId, newStock, variationName = nu
     }
 };
 
-// Get all transactions
-export const getTransactionsList = async (forceRefetch = false) => {
+// Get all transactions (Cached in memory with optional limit)
+export const getTransactionsList = async (forceRefetch = false, maxResults = 300) => {
     if (cacheTransactions && !forceRefetch) {
         return [...cacheTransactions];
     }
@@ -439,7 +439,7 @@ export const getTransactionsList = async (forceRefetch = false) => {
         txs = getLocalTransactions();
     } else {
         try {
-            const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"));
+            const q = query(collection(db, "transactions"), orderBy("timestamp", "desc"), limit(maxResults));
             const querySnapshot = await getDocs(q);
             querySnapshot.forEach(doc => {
                 txs.push(doc.data());

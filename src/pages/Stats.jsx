@@ -29,6 +29,10 @@ export default function Stats() {
                 categorySales[c] = { qty: 0, revenue: 0 };
             });
 
+            // Fast O(1) Product lookup index map
+            const prodsMap = new Map();
+            prods.forEach(p => prodsMap.set(p.id, p));
+
             // Product leaderboard accumulator
             const prodStatsMap = new Map();
             // Daily accumulator for peak sales day
@@ -49,7 +53,7 @@ export default function Stats() {
                 dStat.qty += tx.qty;
 
                 tx.items.forEach(item => {
-                    const originalProduct = prods.find(p => p.id === item.id);
+                    const originalProduct = prodsMap.get(item.id);
                     const category = originalProduct ? originalProduct.category : 'stickers';
                     if (!categorySales[category]) {
                         categorySales[category] = { qty: 0, revenue: 0 };
