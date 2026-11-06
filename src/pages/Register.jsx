@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getProducts, saveTransaction, getCategories, getBundles } from '../services/db';
+import { getProducts, saveTransaction, getCategories, getBundles, fn_validate_cart_stock_integrity } from '../services/db';
 import { t } from '../services/translations';
 import BundleSuggestionBanner from '../components/BundleSuggestionBanner';
 
@@ -251,6 +251,13 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                 expandedItems.push(item);
             }
         });
+
+        // Execute pre-flight stored function validation before opening modal or committing
+        const integrityCheck = await fn_validate_cart_stock_integrity(expandedItems);
+        if (!integrityCheck.valid) {
+            showToast(integrityCheck.reason, "⚠️");
+            return;
+        }
 
         try {
             const transaction = await saveTransaction(expandedItems, totals, paymentMethod, activeCashier, totals.appliedBundles);

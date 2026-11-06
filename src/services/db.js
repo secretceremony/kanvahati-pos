@@ -1222,3 +1222,85 @@ export const sp_import_bundles_batch = async (bundlesList) => {
         return { success: true, count: sanitized.length, bundles: sanitized, fallback: true };
     }
 };
+
+// =========================================================================
+// REACTIVE TRIGGERS & STORED FUNCTIONS (Data Integrity & Inventory Health)
+// =========================================================================
+
+/**
+ * Trigger: trg_check_stock_depletion
+ * Simulates database row trigger: checks if any product's stock has hit zero,
+ * returning depleted items and alerting caller without altering base records.
+ */
+export const trg_check_stock_depletion = async () => {
+    const products = await getProducts();
+    const depleted = products.filter(p => (p.stock || 0) <= 0);
+    const lowStock = products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < 10);
+    return {
+        depletedCount: depleted.length,
+        depletedItems: depleted.map(p => ({ id: p.id, name: p.name, stock: p.stock })),
+        lowStockCount: lowStock.length,
+        lowStockItems: lowStock.map(p => ({ id: p.id, name: p.name, stock: p.stock }))
+    };
+};
+
+/**
+ * Stored Function: fn_calculate_bundle_savings
+ * Deterministic helper calculating original retail sum vs promotional price.
+ */
+export const fn_calculate_bundle_savings = (bundle, allProducts) => {
+    if (!bundle || !Array.isArray(bundle.items)) return { originalTotal: 0, promoPrice: 0, savings: 0, discountPercent: 0 };
+
+    let originalTotal = 0;
+    bundle.items.forEach(item => {
+        const prod = allProducts.find(p => p.id === item.productId);
+        if (prod) {
+            let unitPrice = prod.price || 0;
+            if (item.variationName && prod.variations && prod.variations.length > 0) {
+                const v = prod.variations.find(v => v.name === item.variationName);
+                if (v && v.price) unitPrice = v.price;
+            }
+            originalTotal += unitPrice * (parseInt(item.qty || 1));
+        }
+    });
+
+    const promoPrice = parseFloat(bundle.bundlePrice || 0);
+    const savings = Math.max(0, originalTotal - promoPrice);
+    const discountPercent = originalTotal > 0 ? Math.round((savings / originalTotal) * 100) : 0;
+
+    return {
+        originalTotal,
+        promoPrice,
+        savings,
+        discountPercent
+    };
+};
+
+/**
+ * Stored Function: fn_validate_cart_stock_integrity
+ * SP pre-flight check before committing checkout transaction.
+ */
+export const fn_validate_cart_stock_integrity = async (cartItems) => {
+    if (!cartItems || cartItems.length === 0) return { valid: false, reason: "Cart is empty" };
+
+    const products = await getProducts();
+    for (const item of cartItems) {
+        const prod = products.find(p => p.id === item.id);
+        if (!prod) {
+            return { valid: false, reason: `Produk "${item.name || item.id}" tidak ditemukan dalam inventaris.` };
+        }
+
+        if (item.variationName && prod.variations && prod.variations.length > 0) {
+            const v = prod.variations.find(v => v.name === item.variationName);
+            if (!v || (v.stock || 0) < item.qty) {
+                return { valid: false, reason: `Stok variasi "${item.name} (${item.variationName})" tidak mencukupi (sisa ${v ? v.stock : 0}).` };
+            }
+        } else {
+            if ((prod.stock || 0) < item.qty) {
+                return { valid: false, reason: `Stok produk "${prod.name}" tidak mencukupi (sisa ${prod.stock}).` };
+            }
+        }
+    }
+
+    return { valid: true };
+};

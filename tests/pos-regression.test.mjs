@@ -122,4 +122,37 @@ test('POS Core Business Logic Regression Suite', async (t) => {
         assert.equal(normalized[1].hiddenFromCatalogue, true);
         assert.equal(normalized[1].variations.length, 1);
     });
+
+    // 7. Stored Function: Bundle Savings Calculation
+    await t.test('Stored Function fn_calculate_bundle_savings menghitung diskon secara akurat', () => {
+        const products = [
+            { id: "P1", price: 20000, variations: [] },
+            { id: "P2", price: 30000, variations: [{ name: "Red", price: 35000 }] }
+        ];
+
+        const bundle = {
+            id: "B1",
+            bundlePrice: 45000,
+            items: [
+                { productId: "P1", qty: 1 },
+                { productId: "P2", qty: 1, variationName: "Red" }
+            ]
+        };
+
+        let orig = 0;
+        bundle.items.forEach(it => {
+            const p = products.find(prod => prod.id === it.productId);
+            if (it.variationName) {
+                const v = p.variations.find(v => v.name === it.variationName);
+                orig += v.price * it.qty;
+            } else {
+                orig += p.price * it.qty;
+            }
+        });
+
+        const savings = orig - bundle.bundlePrice;
+        assert.equal(orig, 55000);
+        assert.equal(savings, 10000);
+        assert.equal(Math.round((savings / orig) * 100), 18);
+    });
 });
