@@ -194,10 +194,10 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                                     <Link 
                                         to="/admin" 
                                         onClick={onClose} 
-                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer shadow-[2px_2px_0px_#181818] ${
+                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
                                             currentPath === '/admin'
-                                                ? 'bg-pink text-text border-text translate-x-1'
-                                                : 'bg-yellow text-text border-text hover:bg-yellow-light'
+                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#181818] translate-x-1'
+                                                : 'bg-white/80 text-text/80 border-transparent hover:bg-yellow-light/60 hover:border-text hover:text-text'
                                         }`}
                                     >
                                         <i className="fa-solid fa-shield-halved w-4 text-center"></i>

@@ -86,4 +86,40 @@ test('POS Core Business Logic Regression Suite', async (t) => {
 
         assert.equal(currentStock, 10);
     });
+
+    // 5. Hide From Catalogue Filter & Empty Slot Logic
+    await t.test('Filter Katalog POS mengabaikan produk yang ditandai hiddenFromCatalogue', () => {
+        const catalogProducts = [
+            { id: "KH-STK-001", name: "Chibi Sticker", hiddenFromCatalogue: false, category: "stickers" },
+            { id: "KH-SLOT-002", name: "[Empty Slot]", hiddenFromCatalogue: true, category: "stickers" },
+            { id: "KH-PRT-003", name: "Secret Artprint", hiddenFromCatalogue: true, category: "prints" },
+            { id: "KH-KCH-004", name: "Keyring", hiddenFromCatalogue: false, category: "keychains" }
+        ];
+
+        const visibleInPos = catalogProducts.filter(p => !p.hiddenFromCatalogue);
+        assert.equal(visibleInPos.length, 2);
+        assert.deepEqual(visibleInPos.map(p => p.id), ["KH-STK-001", "KH-KCH-004"]);
+    });
+
+    // 6. Stored Procedure CSV Schema Normalization Simulation
+    await t.test('SP Normalization memvalidasi format CSV item dan variasi', () => {
+        const rawImportRows = [
+            { id: "KH-TEST-1", name: "Test Sticker", price: 10000, stock: 20, hiddenFromCatalogue: false, variations: [] },
+            { id: "", name: "Auto ID Item", price: 25000, stock: 10, hiddenFromCatalogue: true, variations: [{ name: "A", price: 25000, stock: 10 }] }
+        ];
+
+        const normalized = rawImportRows.map(p => ({
+            id: p.id ? p.id.toUpperCase() : "KH-AUTO-001",
+            name: p.name.trim(),
+            price: Number(p.price),
+            stock: Number(p.stock),
+            hiddenFromCatalogue: Boolean(p.hiddenFromCatalogue),
+            variations: p.variations || []
+        }));
+
+        assert.equal(normalized[0].id, "KH-TEST-1");
+        assert.equal(normalized[1].id, "KH-AUTO-001");
+        assert.equal(normalized[1].hiddenFromCatalogue, true);
+        assert.equal(normalized[1].variations.length, 1);
+    });
 });

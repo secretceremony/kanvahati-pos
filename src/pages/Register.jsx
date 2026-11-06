@@ -436,6 +436,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
     // Filters matching search/categories
     const filteredProducts = products.filter(product => {
+        if (product.hiddenFromCatalogue) return false;
         const matchesCategory = activeCategory === 'all' || product.category === activeCategory;
         const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                              product.id.toLowerCase().includes(searchQuery.toLowerCase());

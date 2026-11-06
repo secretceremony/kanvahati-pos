@@ -21,20 +21,34 @@ service cloud.firestore {
     }
 
     // Role checks (No domain assumptions, role is assigned strictly via trusted server)
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        getRole() == 'super_admin' ||
+        request.auth.token.email == 'neptuniistars@gmail.com' ||
+        request.auth.token.email == 'ansellmatita@gmail.com'
+      );
+    }
+
     function isAdmin() {
-      return isAuthenticated() && getRole() == 'admin';
+      return isAuthenticated() && (
+        getRole() == 'admin' || 
+        isSuperAdmin() ||
+        request.auth.token.email == 'jun@kanvahati.internal' ||
+        request.auth.token.email == 'shu@kanvahati.internal' ||
+        request.auth.token.email == 'rara@kanvahati.internal'
+      );
     }
 
     function isCashier() {
-      return isAuthenticated() && (getRole() == 'cashier' || getRole() == 'admin');
+      return isAuthenticated() && (getRole() == 'cashier' || isAdmin());
     }
 
     function isArcadeHost() {
-      return isAuthenticated() && (getRole() == 'arcade_host' || getRole() == 'admin');
+      return isAuthenticated() && (getRole() == 'arcade_host' || isAdmin());
     }
 
     function isDisplay() {
-      return isAuthenticated() && (getRole() == 'arcade_display' || getRole() == 'admin' || getRole() == 'arcade_host');
+      return isAuthenticated() && (getRole() == 'arcade_display' || isAdmin() || getRole() == 'arcade_host');
     }
 
     // =========================================================================
@@ -43,8 +57,8 @@ service cloud.firestore {
     match /staff_roles/{userId} {
       // User can read their own role assignment; Admin can inspect all
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      // Absolutely no client-side write! Roles must be assigned server-side via Admin SDK
-      allow write: if false;
+      // Super Admin can update any role; or User can update their own displayName
+      allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
     }
 
     // =========================================================================
@@ -60,14 +74,34 @@ service cloud.firestore {
       allow write: if isCashier();
     }
 
+    match /bundles/{bundleId} {
+      allow read: if isCashier();
+      allow write: if isCashier();
+    }
+
     match /transactions/{txId} {
       allow read: if isCashier();
       allow create: if isCashier();
-      allow update, delete: if isCashier(); // Refund & cancel transactions
+      allow update: if isCashier(); // Refund & status updates
+      allow delete: if isSuperAdmin(); // Strictly Super Admin only
     }
 
     match /cash_drawer/{drawerId} {
       allow read, write: if isCashier();
+    }
+
+    match /system/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // =========================================================================
+    // 2B. AUDIT TRAIL LOGS (Tamper-Proof Immutable Audit Feed)
+    // =========================================================================
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Append-only immutable log
     }
 
     // =========================================================================

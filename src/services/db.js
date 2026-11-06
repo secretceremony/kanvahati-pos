@@ -1,6 +1,6 @@
 // --- Unified Data Layer with In-Memory Caching (Firestore & LocalStorage Fallback) ---
 import { db } from '../firebase';
-import { collection, getDocs, setDoc, doc, deleteDoc, writeBatch, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, setDoc, doc, deleteDoc, writeBatch, runTransaction, query, orderBy } from 'firebase/firestore';
 
 // Initial Product Data (All natively in IDR Rupiah)
 const initialProducts = [
@@ -220,6 +220,7 @@ export const saveProduct = async (product) => {
         stock: parseInt(product.stock || 0),
         img: product.img || 'assets/mascot.png',
         tag: product.tag || '',
+        hiddenFromCatalogue: Boolean(product.hiddenFromCatalogue),
         variations: product.variations || []
     };
 
@@ -247,7 +248,10 @@ export const saveProduct = async (product) => {
     }
 
     try {
-        await setDoc(doc(db, "products", cleanProduct.id), cleanProduct);
+        await runTransaction(db, async (t) => {
+            const docRef = doc(db, "products", cleanProduct.id);
+            t.set(docRef, cleanProduct);
+        });
         await triggerDataUpdate();
         return cleanProduct;
     } catch (e) {
@@ -525,29 +529,41 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier, app
     }
 
     try {
-        await setDoc(doc(db, "transactions", txId), newTx);
-        
-        // Decrement product stock in Firestore
-        for (const item of items) {
-            const docRef = doc(db, "products", item.id);
-            const prodsList = await getProducts();
-            const original = prodsList.find(p => p.id === item.id);
-            if (original) {
-                if (item.variationName && original.variations && original.variations.length > 0) {
-                    const variations = original.variations.map(v => {
-                        if (v.name === item.variationName) {
-                            return { ...v, stock: Math.max(0, v.stock - item.qty) };
-                        }
-                        return v;
-                    });
-                    const newStock = variations.reduce((sum, v) => sum + v.stock, 0);
-                    await setDoc(docRef, { ...original, variations, stock: newStock });
-                } else {
-                    const newStock = Math.max(0, original.stock - item.qty);
-                    await setDoc(docRef, { ...original, stock: newStock });
+        // Atomic Firestore transaction: write tx and decrement all items stocks together
+        await runTransaction(db, async (transaction) => {
+            // 1. Read phase: fetch all affected product documents atomically
+            const productDocs = [];
+            for (const item of items) {
+                const prodRef = doc(db, "products", item.id);
+                const prodSnap = await transaction.get(prodRef);
+                productDocs.push({ item, prodRef, prodSnap });
+            }
+
+            // 2. Write phase: record transaction
+            const txDocRef = doc(db, "transactions", txId);
+            transaction.set(txDocRef, newTx);
+
+            // 3. Write phase: update product stock levels
+            for (const { item, prodRef, prodSnap } of productDocs) {
+                if (prodSnap.exists()) {
+                    const original = prodSnap.data();
+                    if (item.variationName && original.variations && original.variations.length > 0) {
+                        const variations = original.variations.map(v => {
+                            if (v.name === item.variationName) {
+                                return { ...v, stock: Math.max(0, (v.stock || 0) - item.qty) };
+                            }
+                            return v;
+                        });
+                        const newStock = variations.reduce((sum, v) => sum + v.stock, 0);
+                        transaction.update(prodRef, { variations, stock: newStock });
+                    } else {
+                        const newStock = Math.max(0, (original.stock || 0) - item.qty);
+                        transaction.update(prodRef, { stock: newStock });
+                    }
                 }
             }
-        }
+        });
+        await triggerDataUpdate();
         return newTx;
     } catch (e) {
         console.error("Firestore write transaction failed. Queuing for background sync & writing to LocalStorage.", e);
@@ -1022,7 +1038,10 @@ export const saveBundle = async (bundle) => {
     }
 
     try {
-        await setDoc(doc(db, "bundles", cleanBundle.id), cleanBundle);
+        await runTransaction(db, async (t) => {
+            const docRef = doc(db, "bundles", cleanBundle.id);
+            t.set(docRef, cleanBundle);
+        });
         await triggerDataUpdate();
         return cleanBundle;
     } catch (e) {
@@ -1058,5 +1077,133 @@ export const deleteBundle = async (bundleId) => {
         const filtered = localBundles.filter(b => b.id !== bundleId);
         localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify(filtered));
         return true;
+    }
+};
+
+// =========================================================================
+// STORED PROCEDURE EMULATIONS (Atomic Multi-Document Operations)
+// =========================================================================
+
+/**
+ * SP: sp_import_products_batch
+ * Atomically imports/upserts a list of products with schema normalization.
+ */
+export const sp_import_products_batch = async (productsList) => {
+    if (!productsList || productsList.length === 0) return { success: true, count: 0 };
+
+    const sanitized = productsList.map(p => ({
+        id: (p.id || '').trim().toUpperCase(),
+        name: (p.name || '').trim(),
+        price: parseFloat(p.price || 0),
+        discount: parseFloat(p.discount || 0),
+        category: p.category || 'stickers',
+        stock: parseInt(p.stock || 0),
+        img: p.img || 'assets/mascot.png',
+        tag: p.tag || '',
+        hiddenFromCatalogue: Boolean(p.hiddenFromCatalogue),
+        variations: Array.isArray(p.variations) ? p.variations : []
+    }));
+
+    // Update in-memory cache
+    if (cacheProducts) {
+        sanitized.forEach(clean => {
+            const idx = cacheProducts.findIndex(p => p.id === clean.id);
+            if (idx > -1) cacheProducts[idx] = clean;
+            else cacheProducts.push(clean);
+        });
+        cacheProducts.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    if (!isFirebaseConfigured) {
+        const localProds = getLocalProducts();
+        sanitized.forEach(clean => {
+            const idx = localProds.findIndex(p => p.id === clean.id);
+            if (idx > -1) localProds[idx] = clean;
+            else localProds.push(clean);
+        });
+        localStorage.setItem(LOCAL_PRODS_KEY, JSON.stringify(localProds));
+        return { success: true, count: sanitized.length, items: sanitized };
+    }
+
+    try {
+        const batch = writeBatch(db);
+        sanitized.forEach(clean => {
+            const docRef = doc(db, "products", clean.id);
+            batch.set(docRef, clean);
+        });
+        await batch.commit();
+        await triggerDataUpdate();
+        return { success: true, count: sanitized.length, items: sanitized };
+    } catch (e) {
+        console.error("Firestore batch import products failed. Fallback to local storage.", e);
+        const localProds = getLocalProducts();
+        sanitized.forEach(clean => {
+            const idx = localProds.findIndex(p => p.id === clean.id);
+            if (idx > -1) localProds[idx] = clean;
+            else localProds.push(clean);
+        });
+        localStorage.setItem(LOCAL_PRODS_KEY, JSON.stringify(localProds));
+        return { success: true, count: sanitized.length, items: sanitized, fallback: true };
+    }
+};
+
+/**
+ * SP: sp_import_bundles_batch
+ * Atomically imports/upserts a list of bundles with schema validation.
+ */
+export const sp_import_bundles_batch = async (bundlesList) => {
+    if (!bundlesList || bundlesList.length === 0) return { success: true, count: 0 };
+
+    const sanitized = bundlesList.map(b => ({
+        id: b.id || "BDL-" + Math.floor(100000 + Math.random() * 900000),
+        name: (b.name || '').trim(),
+        items: (b.items || []).map(item => ({
+            productId: item.productId,
+            variationName: item.variationName || null,
+            qty: parseInt(item.qty || 1)
+        })),
+        bundlePrice: parseFloat(b.bundlePrice || 0),
+        isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
+        createdAt: b.createdAt || new Date().toISOString()
+    }));
+
+    if (cacheBundles) {
+        sanitized.forEach(clean => {
+            const idx = cacheBundles.findIndex(b => b.id === clean.id);
+            if (idx > -1) cacheBundles[idx] = clean;
+            else cacheBundles.push(clean);
+        });
+    }
+
+    if (!isFirebaseConfigured) {
+        const localBundles = getLocalBundles();
+        sanitized.forEach(clean => {
+            const idx = localBundles.findIndex(b => b.id === clean.id);
+            if (idx > -1) localBundles[idx] = clean;
+            else localBundles.push(clean);
+        });
+        localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify(localBundles));
+        return { success: true, count: sanitized.length, bundles: sanitized };
+    }
+
+    try {
+        const batch = writeBatch(db);
+        sanitized.forEach(clean => {
+            const docRef = doc(db, "bundles", clean.id);
+            batch.set(docRef, clean);
+        });
+        await batch.commit();
+        await triggerDataUpdate();
+        return { success: true, count: sanitized.length, bundles: sanitized };
+    } catch (e) {
+        console.error("Firestore batch import bundles failed. Fallback to local storage.", e);
+        const localBundles = getLocalBundles();
+        sanitized.forEach(clean => {
+            const idx = localBundles.findIndex(b => b.id === clean.id);
+            if (idx > -1) localBundles[idx] = clean;
+            else localBundles.push(clean);
+        });
+        localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify(localBundles));
+        return { success: true, count: sanitized.length, bundles: sanitized, fallback: true };
     }
 };

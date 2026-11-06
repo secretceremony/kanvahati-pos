@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getBundles, saveBundle, deleteBundle, getProducts } from '../services/db';
+import { getBundles, saveBundle, deleteBundle, getProducts, sp_import_bundles_batch } from '../services/db';
+import * as XLSX from 'xlsx';
 import { recordAuditLog } from '../services/audit';
 import { t } from '../services/translations';
 
@@ -19,6 +20,11 @@ export default function Bundles({ showToast, currentUser, userRole }) {
         isActive: true,
         items: []
     });
+
+    // CSV Import Modal state for Bundles
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importPreview, setImportPreview] = useState([]);
+    const [importErrors, setImportErrors] = useState([]);
 
     const loadData = async () => {
         setLoading(true);
@@ -174,6 +180,155 @@ export default function Bundles({ showToast, currentUser, userRole }) {
         }
     };
 
+    // Download XLSX Template for Bundles
+    const handleDownloadBundlesTemplate = () => {
+        const templateRows = [
+            {
+                "ID (Opsional, kosongkan utk auto)": "BDL-1001",
+                "Nama Bundle": "Paket Wibu Hemat",
+                "Harga Bundle (Rp)": 35000,
+                "Status Aktif (TRUE/FALSE)": "TRUE",
+                "Item Bundle Format (ProductID:Qty:Variasi|...)": "STICKER-01:2|KEYCHAIN-01:1:Matcha"
+            },
+            {
+                "ID (Opsional, kosongkan utk auto)": "BDL-1002",
+                "Nama Bundle": "Duo Artprint Special",
+                "Harga Bundle (Rp)": 120000,
+                "Status Aktif (TRUE/FALSE)": "TRUE",
+                "Item Bundle Format (ProductID:Qty:Variasi|...)": "PRINT-01:1|PRINT-02:1"
+            }
+        ];
+
+        const productRefRows = products.map(p => ({
+            "Product ID": p.id,
+            "Nama Produk": p.name,
+            "Harga": p.price,
+            "Variasi Tersedia": p.variations && p.variations.length > 0 
+                ? p.variations.map(v => v.name).join(', ') 
+                : '-'
+        }));
+
+        const wb = XLSX.utils.book_new();
+        const wsTemplate = XLSX.utils.json_to_sheet(templateRows);
+        const wsProducts = XLSX.utils.json_to_sheet(productRefRows);
+
+        XLSX.utils.book_append_sheet(wb, wsTemplate, "Template Bundle");
+        XLSX.utils.book_append_sheet(wb, wsProducts, "Referensi Produk");
+
+        XLSX.writeFile(wb, "kanvahati_template_bundles.xlsx");
+        if (showToast) showToast("Template XLSX Bundle berhasil diunduh!", "📊");
+    };
+
+    // Handle CSV Import for Bundles
+    const handleCsvFileUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const text = evt.target.result;
+                const lines = text.split(String.fromCharCode(10)).filter(line => line.trim() !== "");
+                if (lines.length < 2) {
+                    if (showToast) showToast("File CSV kosong atau tidak valid!", "⚠️");
+                    return;
+                }
+
+                const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                const previewRows = [];
+                const errors = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i];
+                    const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+                    const cleanValues = values.map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+
+                    const rowObj = {};
+                    headers.forEach((h, idx) => {
+                        rowObj[h] = cleanValues[idx] !== undefined ? cleanValues[idx] : '';
+                    });
+
+                    const name = rowObj["Nama Bundle"] || rowObj["name"] || rowObj["Nama"] || cleanValues[1] || '';
+                    if (!name) {
+                        errors.push(`Baris ${i + 1}: Nama bundle kosong.`);
+                        continue;
+                    }
+
+                    const rawId = rowObj["ID"] || rowObj["id"] || rowObj["ID (Opsional, kosongkan utk auto)"] || cleanValues[0] || '';
+                    const bundlePrice = parseFloat(rowObj["Harga Bundle (Rp)"] || rowObj["bundlePrice"] || cleanValues[2] || 0);
+                    const activeRaw = String(rowObj["Status Aktif (TRUE/FALSE)"] || rowObj["isActive"] || cleanValues[3] || 'TRUE').toUpperCase();
+                    const isActive = activeRaw === 'TRUE' || activeRaw === '1' || activeRaw === 'YA';
+                    const itemsRaw = rowObj["Item Bundle Format (ProductID:Qty:Variasi|...)"] || rowObj["items"] || cleanValues[4] || '';
+
+                    if (!itemsRaw) {
+                        errors.push(`Baris ${i + 1}: Kolom item bundle kosong.`);
+                        continue;
+                    }
+
+                    const itemTokens = itemsRaw.split('|');
+                    const parsedItems = itemTokens.map(tok => {
+                        const parts = tok.split(':');
+                        const pId = (parts[0] || '').trim();
+                        const pQty = parseInt(parts[1] || 1);
+                        const pVar = parts[2] ? parts[2].trim() : null;
+                        return { productId: pId, qty: pQty, variationName: pVar };
+                    }).filter(it => it.productId);
+
+                    if (parsedItems.length === 0) {
+                        errors.push(`Baris ${i + 1}: Tidak ada item valid dalam bundle.`);
+                        continue;
+                    }
+
+                    previewRows.push({
+                        id: rawId ? rawId.trim() : "BDL-" + Math.floor(100000 + Math.random() * 900000),
+                        name,
+                        bundlePrice,
+                        isActive,
+                        items: parsedItems,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+
+                setImportPreview(previewRows);
+                setImportErrors(errors);
+                setShowImportModal(true);
+            } catch (err) {
+                console.error("CSV parse error for bundles:", err);
+                if (showToast) showToast("Format CSV bundle gagal diproses!", "⚠️");
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    };
+
+    // Execute Stored Procedure Batch Import for Bundles
+    const handleExecuteImportBundles = async () => {
+        if (importPreview.length === 0) return;
+        try {
+            const res = await sp_import_bundles_batch(importPreview);
+            if (res.success) {
+                await recordAuditLog({
+                    action: 'DISCOUNT_CHANGE',
+                    summary: `Batch Import Bundle via SP: ${res.count} paket promo berhasil diimport`,
+                    actor: {
+                        uid: currentUser?.uid,
+                        email: currentUser?.email,
+                        displayName: currentUser?.displayName || 'Staf',
+                        role: userRole
+                    },
+                    details: { importedCount: res.count }
+                });
+                if (showToast) showToast(`${res.count} bundle promo berhasil diimport via SP Transaction!`, "🎉");
+                setShowImportModal(false);
+                setImportPreview([]);
+                setImportErrors([]);
+                loadData();
+            }
+        } catch (e) {
+            if (showToast) showToast("Gagal melakukan batch import bundle", "⚠️");
+        }
+    };
+
     const formatMoney = (value) => {
         return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
     };
@@ -196,12 +351,38 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                     <h2 className="font-title text-2xl text-text title-stroke"><i className="fa-solid fa-tags text-pink"></i> Kelola {t.bundles}</h2>
                     <p className="text-sm opacity-80 mt-1 font-body">Buat paket promosi yang otomatis muncul di terminal kasir.</p>
                 </div>
-                <button 
-                    onClick={() => handleOpenModal()}
-                    className="btn bg-pink text-text border-[2.5px] border-text rounded-full font-title text-[13px] px-5 py-2 shadow-btn hover:bg-white hover:translate-y-[-2px] transition-all cursor-pointer flex items-center gap-2 font-bold"
-                >
-                    <i className="fa-solid fa-plus"></i> {t.addBundle}
-                </button>
+                
+                {/* Bundle Action Toolbar: CSV Import, XLSX Template, Add Bundle */}
+                <div className="flex flex-wrap items-center gap-2">
+                    <label 
+                        className="btn bg-pink text-text border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Import bundle via file CSV"
+                    >
+                        <i className="fa-solid fa-file-csv"></i> Import CSV
+                        <input 
+                            type="file" 
+                            accept=".csv" 
+                            onChange={handleCsvFileUpload} 
+                            className="hidden" 
+                        />
+                    </label>
+
+                    <button 
+                        type="button"
+                        onClick={handleDownloadBundlesTemplate}
+                        className="btn bg-yellow text-text border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Unduh format spreadsheet bundle .xlsx"
+                    >
+                        <i className="fa-solid fa-file-excel"></i> Template XLSX
+                    </button>
+
+                    <button 
+                        onClick={() => handleOpenModal()}
+                        className="btn bg-blue-light text-text border-[2.5px] border-text rounded-full font-title text-[13px] px-4 py-1.5 shadow-btn hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 font-bold"
+                    >
+                        <i className="fa-solid fa-plus"></i> {t.addBundle}
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -437,6 +618,111 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                             >
                                 Simpan Bundle
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CSV Import Preview Modal for Bundles */}
+            {showImportModal && (
+                <div className="fixed inset-0 bg-[#181818]/60 backdrop-blur-sm z-[10001] flex justify-center items-center p-4 animate-[fade_0.2s_ease]">
+                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-full max-w-[650px] max-h-[85vh] overflow-hidden flex flex-col text-text relative">
+                        <div className="retro-window-header bg-yellow border-b-[2.5px] border-text px-4 py-2.5 flex items-center justify-between">
+                            <div className="retro-dots flex items-center gap-1.5">
+                                <span className="retro-dot retro-dot-red"></span>
+                                <span className="retro-dot retro-dot-yellow"></span>
+                                <span className="retro-dot retro-dot-blue"></span>
+                                <span className="font-tag text-xs font-black uppercase tracking-wider text-text ml-2">Preview Import CSV Bundle</span>
+                            </div>
+                            <button 
+                                onClick={() => setShowImportModal(false)}
+                                className="text-text hover:text-white transition-transform hover:scale-110 cursor-pointer"
+                            >
+                                <i className="fa-solid fa-xmark text-lg"></i>
+                            </button>
+                        </div>
+
+                        <div className="p-4 sm:p-5 flex flex-col gap-3 overflow-y-auto font-body">
+                            <div className="flex items-center justify-between bg-yellow-light/40 border-2 border-text rounded-xl p-3">
+                                <div>
+                                    <span className="font-title text-sm font-bold block text-text">Daftar Bundle Promosi</span>
+                                    <span className="text-xs text-text/80">
+                                        Total <strong>{importPreview.length}</strong> bundle siap di-commit via Stored Procedure Transaction.
+                                    </span>
+                                </div>
+                                <span className="bg-pink text-text font-tag text-xs font-black px-2.5 py-1 rounded-full border border-text shadow-[1px_1px_0px_#181818]">
+                                    {importPreview.length} BUNDLES
+                                </span>
+                            </div>
+
+                            {importErrors.length > 0 && (
+                                <div className="bg-pink-light/40 border-2 border-rose-600 rounded-xl p-3 text-xs text-rose-900 font-bold">
+                                    <div className="flex items-center gap-1.5 mb-1 text-rose-800">
+                                        <i className="fa-solid fa-triangle-exclamation"></i>
+                                        <span>Catatan Baris Diabaikan:</span>
+                                    </div>
+                                    <ul className="list-disc list-inside space-y-0.5">
+                                        {importErrors.map((err, idx) => (
+                                            <li key={idx}>{err}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            <div className="border-2 border-text rounded-xl overflow-x-auto max-h-[300px]">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead className="bg-blue-light border-b-2 border-text font-title">
+                                        <tr>
+                                            <th className="p-2 border-r border-text/20">ID</th>
+                                            <th className="p-2 border-r border-text/20">Nama Bundle</th>
+                                            <th className="p-2 border-r border-text/20">Harga Promo</th>
+                                            <th className="p-2 border-r border-text/20">Jml Item</th>
+                                            <th className="p-2">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-text/15">
+                                        {importPreview.map((b, idx) => (
+                                            <tr key={idx} className="hover:bg-yellow-light/20">
+                                                <td className="p-2 font-mono font-bold border-r border-text/10">{b.id}</td>
+                                                <td className="p-2 font-bold border-r border-text/10">{b.name}</td>
+                                                <td className="p-2 font-mono font-bold text-pink border-r border-text/10">{formatMoney(b.bundlePrice)}</td>
+                                                <td className="p-2 border-r border-text/10">
+                                                    {b.items.map(it => `${it.productId} (x${it.qty})`).join(', ')}
+                                                </td>
+                                                <td className="p-2">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                        b.isActive ? 'bg-emerald-100 text-emerald-800 border-emerald-400' : 'bg-gray-200 text-gray-700 border-gray-400'
+                                                    }`}>
+                                                        {b.isActive ? 'Aktif' : 'Nonaktif'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        setShowImportModal(false);
+                                        setImportPreview([]);
+                                        setImportErrors([]);
+                                    }}
+                                    className="btn bg-white text-text border-[3px] border-text rounded-full font-title text-[12px] px-4 py-2.5 shadow-btn hover:bg-yellow-light cursor-pointer"
+                                >
+                                    Batalkan
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleExecuteImportBundles}
+                                    className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[12px] px-4 py-2.5 shadow-btn hover:bg-white cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    <i className="fa-solid fa-cloud-arrow-up"></i>
+                                    Commit Stored Procedure ({importPreview.length})
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
