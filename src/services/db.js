@@ -386,27 +386,27 @@ export const updateProductStock = async (productId, newStock, variationName = nu
     }
 
     try {
-        const prodsList = await getProducts();
-        const product = prodsList.find(p => p.id === productId);
-        if (product) {
-            if (variationName && product.variations && product.variations.length > 0) {
-                const variations = product.variations.map(v => {
-                    if (v.name === variationName) {
-                        return { ...v, stock: newStock };
-                    }
-                    return v;
-                });
-                const totalStock = variations.reduce((sum, v) => sum + v.stock, 0);
-                const updated = { ...product, variations, stock: totalStock };
-                await setDoc(doc(db, "products", productId), updated);
-                return updated;
-            } else {
-                product.stock = newStock;
-                await setDoc(doc(db, "products", productId), product);
-                return product;
+        await runTransaction(db, async (t) => {
+            const prodRef = doc(db, "products", productId);
+            const prodSnap = await t.get(prodRef);
+            if (prodSnap.exists()) {
+                const product = prodSnap.data();
+                if (variationName && product.variations && product.variations.length > 0) {
+                    const variations = product.variations.map(v => {
+                        if (v.name === variationName) {
+                            return { ...v, stock: newStock };
+                        }
+                        return v;
+                    });
+                    const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+                    t.update(prodRef, { variations, stock: totalStock });
+                } else {
+                    t.update(prodRef, { stock: newStock });
+                }
             }
-        }
-        return null;
+        });
+        await triggerDataUpdate();
+        return true;
     } catch (e) {
         console.error("Firestore stock update failed. Updating locally.", e);
         const localProds = getLocalProducts();
@@ -760,32 +760,47 @@ export const deleteTransactionAndRefund = async (transactionId) => {
         return true;
     }
 
-    // 4. Firestore Refund and Deletion
+    // 4. Firestore Atomic Refund and Deletion using runTransaction
     try {
-        // Delete transaction document
-        await deleteDoc(doc(db, "transactions", transactionId));
+        await runTransaction(db, async (t) => {
+            const txDocRef = doc(db, "transactions", transactionId);
+            const txSnap = await t.get(txDocRef);
+            if (!txSnap.exists()) {
+                throw new Error("Transaction document not found in Firestore");
+            }
 
-        // Restore stocks in Firestore
-        for (const item of itemsToRefund) {
-            const docRef = doc(db, "products", item.id);
-            const prodsList = await getProducts();
-            const original = prodsList.find(p => p.id === item.id);
-            if (original) {
-                if (item.variationName && original.variations && original.variations.length > 0) {
-                    const variations = original.variations.map(v => {
-                        if (v.name === item.variationName) {
-                            return { ...v, stock: (v.stock || 0) + item.qty };
-                        }
-                        return v;
-                    });
-                    const newStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
-                    await setDoc(docRef, { ...original, variations, stock: newStock });
-                } else {
-                    const newStock = (original.stock || 0) + item.qty;
-                    await setDoc(docRef, { ...original, stock: newStock });
+            // 1. Read all affected product docs atomically
+            const productReads = [];
+            for (const item of itemsToRefund) {
+                const prodRef = doc(db, "products", item.id);
+                const prodSnap = await t.get(prodRef);
+                productReads.push({ item, prodRef, prodSnap });
+            }
+
+            // 2. Delete transaction document
+            t.delete(txDocRef);
+
+            // 3. Increment stock levels back atomically
+            for (const { item, prodRef, prodSnap } of productReads) {
+                if (prodSnap.exists()) {
+                    const original = prodSnap.data();
+                    if (item.variationName && original.variations && original.variations.length > 0) {
+                        const variations = original.variations.map(v => {
+                            if (v.name === item.variationName) {
+                                return { ...v, stock: (v.stock || 0) + item.qty };
+                            }
+                            return v;
+                        });
+                        const newStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+                        t.update(prodRef, { variations, stock: newStock });
+                    } else {
+                        const newStock = (original.stock || 0) + item.qty;
+                        t.update(prodRef, { stock: newStock });
+                    }
                 }
             }
-        }
+        });
+        await triggerDataUpdate();
         return true;
     } catch (e) {
         console.error("Firestore refund/delete failed, executing locally.", e);
