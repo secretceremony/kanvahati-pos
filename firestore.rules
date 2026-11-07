@@ -23,20 +23,20 @@ service cloud.firestore {
     // Role checks (No domain assumptions, role is assigned strictly via trusted server)
     function isSuperAdmin() {
       return isAuthenticated() && (
-        getRole() == 'super_admin' ||
         request.auth.token.email == 'neptuniistars@gmail.com' ||
-        request.auth.token.email == 'ansellmatita@gmail.com'
+        request.auth.token.email == 'ansellmatita@gmail.com' ||
+        getRole() == 'super_admin'
       );
     }
 
     function isAdmin() {
       return isAuthenticated() && (
-        getRole() == 'admin' || 
         isSuperAdmin() ||
         request.auth.token.email == 'jun@kanvahati.internal' ||
         request.auth.token.email == 'junn@kanvahati.internal' ||
         request.auth.token.email == 'shu@kanvahati.internal' ||
-        request.auth.token.email == 'rara@kanvahati.internal'
+        request.auth.token.email == 'rara@kanvahati.internal' ||
+        getRole() == 'admin'
       );
     }
 
