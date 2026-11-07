@@ -160,23 +160,9 @@ export const deleteCategory = async (categoryName) => {
     }
 };
 
-// Seed products to Firestore if empty
+// Seed products to Firestore if empty (DISABLED: Database is production, never seed hardcoded/dummy products)
 export const seedProductsIfEmpty = async () => {
-    if (!isFirebaseConfigured) return;
-    try {
-        const querySnapshot = await getDocs(collection(db, "products"));
-        if (querySnapshot.empty) {
-            console.log("🔥 Seeding products collection in Firebase Firestore...");
-            const batch = writeBatch(db);
-            initialProducts.forEach((p) => {
-                const docRef = doc(db, "products", p.id);
-                batch.set(docRef, p);
-            });
-            await batch.commit();
-        }
-    } catch (e) {
-        console.error("Firebase seeding failed. Falling back to local state.", e);
-    }
+    return;
 };
 
 // Get all products
@@ -191,17 +177,12 @@ export const getProducts = async (forceRefetch = false) => {
     } else {
         try {
             const querySnapshot = await getDocs(collection(db, "products"));
-            if (querySnapshot.empty) {
-                await seedProductsIfEmpty();
-                prods = [...initialProducts];
-            } else {
-                querySnapshot.forEach(doc => {
-                    prods.push(doc.data());
-                });
-            }
+            querySnapshot.forEach(doc => {
+                prods.push(doc.data());
+            });
         } catch (e) {
-            console.warn("Firestore read products failed, using local fallback.", e);
-            prods = getLocalProducts();
+            console.error("Firestore read products failed:", e);
+            throw e;
         }
     }
 
@@ -445,8 +426,8 @@ export const getTransactionsList = async (forceRefetch = false, maxResults = 300
                 txs.push(doc.data());
             });
         } catch (e) {
-            console.warn("Firestore read transactions failed, using local fallback.", e);
-            txs = getLocalTransactions();
+            console.error("Firestore read transactions failed:", e);
+            throw e;
         }
     }
 

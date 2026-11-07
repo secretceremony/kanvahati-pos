@@ -72,6 +72,7 @@ export const fetchUserData = async (user) => {
 
     const ADMIN_MAP = {
         "jun@kanvahati.internal": "Jun",
+        "junn@kanvahati.internal": "Jun",
         "shu@kanvahati.internal": "Shu",
         "rara@kanvahati.internal": "Rara"
     };

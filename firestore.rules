@@ -34,6 +34,7 @@ service cloud.firestore {
         getRole() == 'admin' || 
         isSuperAdmin() ||
         request.auth.token.email == 'jun@kanvahati.internal' ||
+        request.auth.token.email == 'junn@kanvahati.internal' ||
         request.auth.token.email == 'shu@kanvahati.internal' ||
         request.auth.token.email == 'rara@kanvahati.internal'
       );

@@ -55,6 +55,12 @@ export const DEFAULT_DESIGNATED_STAFF = [
         role: "admin"
     },
     {
+        uid: "staff_junn_kanvahati_internal",
+        email: "junn@kanvahati.internal",
+        displayName: "Jun",
+        role: "admin"
+    },
+    {
         uid: "staff_shu_kanvahati_internal",
         email: "shu@kanvahati.internal",
         displayName: "Shu",
