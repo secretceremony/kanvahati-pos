@@ -436,7 +436,7 @@ export const getTransactionsList = async (forceRefetch = false, maxResults = 300
 };
 
 // Save a new transaction (decrements variation stock if matching)
-export const saveTransaction = async (items, totals, paymentMethod, cashier, appliedBundles = []) => {
+export const saveTransaction = async (items, totals, paymentMethod, cashier, appliedBundles = [], cashDetails = null) => {
     const txId = "TX-" + Math.floor(100000 + Math.random() * 900000);
     const newTx = {
         id: txId,
@@ -458,6 +458,11 @@ export const saveTransaction = async (items, totals, paymentMethod, cashier, app
         paymentMethod: paymentMethod,
         cashier: (cashier || "Staf").replace(/^Kasir\s+/i, '')
     };
+
+    if (cashDetails) {
+        if (cashDetails.cashReceived !== undefined) newTx.cashReceived = cashDetails.cashReceived;
+        if (cashDetails.change !== undefined) newTx.change = cashDetails.change;
+    }
 
 // 4. Update in-memory product stock cache directly!
     if (cacheProducts) {

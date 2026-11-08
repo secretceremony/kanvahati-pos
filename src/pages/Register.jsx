@@ -20,6 +20,10 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     // QRIS scan overlay visibility state
     const [showQrisModal, setShowQrisModal] = useState(false);
 
+    // Cash Payment Tender Modal state (Angsul / Kembalian calculator)
+    const [showCashModal, setShowCashModal] = useState(false);
+    const [cashReceivedInput, setCashReceivedInput] = useState('');
+
     // Variation selector state
     const [variationProduct, setVariationProduct] = useState(null);
     const [selectedVarQuantities, setSelectedVarQuantities] = useState({});
@@ -299,14 +303,18 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         if (paymentMethod === 'qris') {
             setShowQrisModal(true); // Pop up QRIS scan layout first
         } else {
-            completeCheckout(); // Proceed directly for Cash
+            // Open Cash Tender Modal for change calculation
+            const totals = calculateTotals();
+            setCashReceivedInput(String(totals.total)); // Pre-fill with exact amount
+            setShowCashModal(true);
         }
     };
 
     // Execute checkout and write to database
-    const completeCheckout = async () => {
+    const completeCheckout = async (cashDetails = null) => {
         const totals = calculateTotals();
         setShowQrisModal(false);
+        setShowCashModal(false);
         
         // Expand bundles before saving to DB
         let expandedItems = [];
@@ -343,9 +351,10 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         }
 
         try {
-            const transaction = await saveTransaction(expandedItems, totals, paymentMethod, activeCashier, totals.appliedBundles);
+            const transaction = await saveTransaction(expandedItems, totals, paymentMethod, activeCashier, totals.appliedBundles, cashDetails);
             setTicket([]);
             setDismissedBundles(new Set());
+            setCashReceivedInput('');
             await fetchData(); // Refresh stock variables in grids
             onCheckoutSuccess(transaction);
             showToast(t.paymentSuccess, "🎉");
@@ -993,6 +1002,142 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                         <span>+ Masukkan ke Keranjang</span>
                                     </button>
                                 </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
+
+            {/* Cash Payment & Change (Angsul) Calculation Modal */}
+            {showCashModal && (
+                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-3 sm:p-4">
+                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[94vw] max-w-[380px] overflow-hidden flex flex-col p-4 sm:p-5 text-text relative">
+                        <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-8 transform rotate-[-4deg] h-6 w-24 bg-yellow"></div>
+                        
+                        {/* Header */}
+                        <div className="w-full flex justify-between items-center border-b border-text/15 pb-2 mb-3">
+                            <div>
+                                <span className="font-tag text-[10px] font-black uppercase tracking-wider text-pink block">Pembayaran Tunai</span>
+                                <h3 className="font-title text-base font-bold text-text">
+                                    Hitung Kembalian (Angsul)
+                                </h3>
+                            </div>
+                            <button 
+                                onClick={() => setShowCashModal(false)}
+                                className="w-8 h-8 rounded-full border-2 border-text bg-yellow-light hover:bg-yellow flex items-center justify-center text-text hover:text-pink transition-transform hover:scale-105 cursor-pointer shadow-[1px_1px_0px_#181818]"
+                            >
+                                <i className="fa-solid fa-xmark text-sm"></i>
+                            </button>
+                        </div>
+
+                        {/* Bill Total Card */}
+                        <div className="bg-blue-light/35 border-2 border-text rounded-xl p-3 flex justify-between items-center mb-3.5">
+                            <div>
+                                <span className="text-[10px] uppercase font-bold text-text/70 block font-tag">Total Tagihan</span>
+                                <span className="font-title font-extrabold text-lg text-text">
+                                    {formatDisplayMoney(totals.total)}
+                                </span>
+                            </div>
+                            <span className="bg-white border border-text px-2 py-0.5 rounded font-tag text-[10px] font-bold">
+                                {totals.qty} barang
+                            </span>
+                        </div>
+
+                        {/* Input Cash Received */}
+                        <div className="flex flex-col gap-1.5 mb-3">
+                            <label className="text-[11px] font-bold uppercase text-text/80 font-tag tracking-wider flex justify-between">
+                                <span>Uang Diterima dari Pembeli:</span>
+                                <span className="text-pink font-bold">{formatDisplayMoney(parseFloat(cashReceivedInput) || 0)}</span>
+                            </label>
+                            <div className="relative flex items-center">
+                                <span className="absolute left-3 font-title font-bold text-sm text-text/60">Rp</span>
+                                <input 
+                                    type="number"
+                                    min="0"
+                                    autoFocus
+                                    placeholder="0"
+                                    value={cashReceivedInput}
+                                    onChange={(e) => setCashReceivedInput(e.target.value)}
+                                    className="w-full border-2 border-text rounded-xl py-2 pl-9 pr-3 text-base font-title font-bold text-text outline-none focus:bg-yellow-light/20 bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Quick Nominal Chips */}
+                        <div className="flex flex-wrap gap-1.5 mb-3.5">
+                            <button
+                                type="button"
+                                onClick={() => setCashReceivedInput(String(totals.total))}
+                                className="text-[10.5px] font-tag font-bold bg-yellow border border-text rounded-lg px-2 py-1 shadow-[1px_1px_0px_#181818] hover:bg-white transition-all cursor-pointer"
+                            >
+                                Uang Pas
+                            </button>
+                            {[10000, 20000, 50000, 100000].map(nominal => (
+                                <button
+                                    key={nominal}
+                                    type="button"
+                                    onClick={() => setCashReceivedInput(String(nominal))}
+                                    className="text-[10.5px] font-tag font-bold bg-white border border-text rounded-lg px-2 py-1 shadow-[1px_1px_0px_#181818] hover:bg-yellow-light transition-all cursor-pointer"
+                                >
+                                    {nominal >= 1000 ? `${nominal / 1000}k` : nominal}
+                                </button>
+                            ))}
+                            {/* Nearest ceiling denomination if applicable */}
+                            {totals.total > 0 && totals.total % 10000 !== 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setCashReceivedInput(String(Math.ceil(totals.total / 10000) * 10000))}
+                                    className="text-[10.5px] font-tag font-bold bg-pink-light border border-text rounded-lg px-2 py-1 shadow-[1px_1px_0px_#181818] hover:bg-white transition-all cursor-pointer text-text"
+                                >
+                                    Bulat {Math.ceil(totals.total / 10000) * 10}k
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Change / Shortage Display Box */}
+                        {(() => {
+                            const received = parseFloat(cashReceivedInput) || 0;
+                            const change = received - totals.total;
+                            const isSufficient = change >= 0;
+
+                            return (
+                                <div className={`border-2 rounded-xl p-3 mb-4 text-center transition-all ${
+                                    isSufficient 
+                                        ? 'bg-emerald-50 border-emerald-600 shadow-[2px_2px_0px_#166534]' 
+                                        : 'bg-rose-50 border-rose-500 shadow-[2px_2px_0px_#9f1239]'
+                                }`}>
+                                    <span className="text-[10px] uppercase font-bold tracking-wider block font-tag">
+                                        {isSufficient ? 'Kembalian / Angsul:' : 'Uang Masih Kurang:'}
+                                    </span>
+                                    <span className={`font-title font-extrabold text-xl block mt-0.5 ${
+                                        isSufficient ? 'text-emerald-800' : 'text-rose-700'
+                                    }`}>
+                                        {formatDisplayMoney(Math.abs(change))}
+                                    </span>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Submit Action Button */}
+                        {(() => {
+                            const received = parseFloat(cashReceivedInput) || 0;
+                            const change = Math.max(0, received - totals.total);
+                            const isSufficient = received >= totals.total;
+
+                            return (
+                                <button 
+                                    type="button"
+                                    disabled={!isSufficient}
+                                    onClick={() => completeCheckout({ cashReceived: received, change })}
+                                    className={`w-full py-2.5 rounded-xl border-[2.5px] border-text font-title font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                                        isSufficient
+                                            ? 'bg-pink text-text shadow-[2.5px_2.5px_0px_#181818] hover:bg-white active:translate-y-[1px] active:shadow-none cursor-pointer'
+                                            : 'bg-gray-200 text-gray-400 border-gray-400 cursor-not-allowed opacity-60 shadow-none'
+                                    }`}
+                                >
+                                    <i className="fa-solid fa-check-circle"></i>
+                                    <span>Konfirmasi & Simpan Transaksi</span>
+                                </button>
                             );
                         })()}
                     </div>

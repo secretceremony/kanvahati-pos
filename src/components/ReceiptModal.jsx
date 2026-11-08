@@ -56,6 +56,16 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                     <span>Metode:</span>
                     <span style="font-weight: bold;">${transaction.paymentMethod === 'cash' ? 'TUNAI' : 'QRIS'}</span>
                 </div>
+                ${transaction.cashReceived !== undefined ? `
+                    <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                        <span>Uang Diterima:</span>
+                        <span>Rp ${(transaction.cashReceived || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 4px; font-weight: bold; color: #166534;">
+                        <span>Kembalian / Angsul:</span>
+                        <span>Rp ${(transaction.change || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                ` : ''}
             </div>
             <hr style="border: none; border-top: 1.5px dashed #000; margin: 15px 0;" />
             <div style="text-align: center; margin-top: 20px;">
@@ -200,6 +210,18 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                                 {transaction.paymentMethod === 'cash' ? t.cash : t.qris}
                             </span>
                         </div>
+                        {transaction.cashReceived !== undefined && (
+                            <>
+                                <div className="r-summary-row flex justify-between text-[11.5px] font-bold text-text/80 pt-1 border-t border-dashed border-text/20 mt-1">
+                                    <span>Uang Diterima:</span>
+                                    <span>{formatReceiptMoney(transaction.cashReceived)}</span>
+                                </div>
+                                <div className="r-summary-row flex justify-between text-xs font-title font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-300 mt-1">
+                                    <span>Kembalian / Angsul:</span>
+                                    <span>{formatReceiptMoney(transaction.change || 0)}</span>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div className="receipt-divider border-t-2 border-dashed border-text/40 my-3"></div>
