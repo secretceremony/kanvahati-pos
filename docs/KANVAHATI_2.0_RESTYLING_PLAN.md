@@ -97,6 +97,37 @@ Semua kontainer modul utama (Katalog, Keranjang, Tabel Stok, Riwayat, Admin Hub,
    - Tidak mengubah kalkulasi harga, diskon bundle, rumus keranjang, maupun logika Firestore.
    - Hak Super Admin (`neptuniistars@gmail.com`, `ansellmatita@gmail.com`) dan Admin Kasir (`jun`, `shu`, `rara`) tetap terikat pada Firestore `staff_roles` dan `firestore.rules`.
 2. **Standard Verifikasi Kualitas**:
-   - 97 Unit Test wajib passing (`npm test`).
+   - 100 Unit Test wajib passing (`npm test`).
    - Production bundle wajib lolos compile (`npm run build`).
-   - Audit visual headless browser via Camoufox pada viewport desktop (1440x900) dan mobile (390x844).
+   - Audit visual headless browser via Camoufox/Playwright pada viewport desktop (1440x900) dan mobile (390x844).
+
+---
+
+## 6. Rencana Fitur Baru: Multi-Variasi & Quantity Selector Kasir (Mobile & Desktop)
+
+### A. Latar Belakang & Kebutuhan
+Mempermudah kasir saat pembeli memesan beberapa opsi variasi sekaligus (contoh: *Sticker Fandom C* opsi *Karakter A x2 pcs* dan *Karakter B x1 pcs*) dalam satu interaksi cepat tanpa harus berulang kali membuka dan menutup modal katalog.
+
+### B. Spesifikasi Desain & Responsivitas Mobile
+1. **Modal Form Multi-Variasi (`Register.jsx`)**:
+   - **Tampilan Desktop & Mobile**:
+     - Menggunakan Retro Window Neobrutalist (`rounded-2xl`, border `3px solid #181818`, shadow pop).
+     - Di mobile (viewport `< 640px`), modal tampil adaptif: `w-[92vw] max-w-[420px] max-h-[85vh]` dengan flex vertikal dan internal scroll agar tombol aksi bawah tidak tertutup keyboard/layar.
+2. **Elemen Tiap Baris Variasi**:
+   - Nama variasi + chip badge diskon (jika ada).
+   - Harga efektif (setelah diskon satuan) & sisa stok.
+   - **Stepper Kuantitas Ramah Sentuhan Mobile (Touch-friendly)**:
+     - Tombol `[-]` (merah muda/putih) ukuran minimal `32x32px` agar mudah ditekan jari di smartphone.
+     - Angka display counter kuantitas di tengah (`0`, `1`, `2`, dst).
+     - Tombol `[+]` (kuning/biru) ukuran minimal `32x32px` dengan safeguard batas atas `maxStock`.
+3. **Sticky Action Bar Bawah**:
+   - Rangkuman total: `N item dipilih • Rp X.XXX`
+   - Tombol utama Neobrutalist: `+ Masukkan ke Keranjang`
+   - Tombol batal / tutup (`X` di header atau klik backdrop).
+4. **Eksekusi Keranjang (`handleBatchAddToTicket`)**:
+   - Memasukkan seluruh variasi terpilih yang `qty > 0` ke dalam keranjang kasir (`ticket`) secara bersamaan.
+   - Auto-bundling & validasi stok tetap aktif seperti biasa.
+
+### C. Safeguard Database
+- **ZERO DATABASE MUTATION**: Fitur ini sepenuhnya merupakan pembaruan logika client-side antarmuka kasir.
+- Tidak ada penghapusan, modifikasi skema, atau pembersihan pada koleksi Firebase Firestore (`products`, `transactions`, `bundles`, `categories`).
