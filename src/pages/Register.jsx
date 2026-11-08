@@ -22,6 +22,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
     // Variation selector state
     const [variationProduct, setVariationProduct] = useState(null);
+    const [selectedVarQuantities, setSelectedVarQuantities] = useState({});
 
     // Mobile layout toggle state
     const [activeMobileTab, setActiveMobileTab] = useState('catalog');
@@ -90,6 +91,11 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
         // Check if item has variations and one is not yet selected
         if (product.variations && product.variations.length > 0 && !selectedVar) {
+            const initialQtyMap = {};
+            product.variations.forEach(v => {
+                initialQtyMap[v.name] = 0;
+            });
+            setSelectedVarQuantities(initialQtyMap);
             setVariationProduct(product);
             return;
         }
@@ -134,6 +140,76 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
         // Close selector if it was open
         setVariationProduct(null);
+        setSelectedVarQuantities({});
+    };
+
+    // Multi-variation batch add to ticket
+    const handleBatchAddVariations = (e) => {
+        if (e && e.clientX) triggerSparkles(e.clientX, e.clientY);
+        if (!variationProduct || !variationProduct.variations) return;
+
+        let addedCount = 0;
+        let totalItemsAdded = 0;
+
+        setTicket(prevTicket => {
+            let updated = [...prevTicket];
+
+            variationProduct.variations.forEach(v => {
+                const addQty = selectedVarQuantities[v.name] || 0;
+                if (addQty <= 0) return;
+
+                const basePrice = v.price || 0;
+                const itemDiscount = v.discount || 0;
+                const finalPrice = Math.max(0, basePrice - itemDiscount);
+                const maxStock = v.stock || 0;
+                const displayName = `${variationProduct.name} (${v.name})`;
+
+                const existingIdx = updated.findIndex(it => it.id === variationProduct.id && it.variationName === v.name);
+                if (existingIdx > -1) {
+                    const existing = updated[existingIdx];
+                    const targetQty = Math.min(maxStock, existing.qty + addQty);
+                    updated[existingIdx] = {
+                        ...existing,
+                        qty: targetQty
+                    };
+                } else {
+                    const targetQty = Math.min(maxStock, addQty);
+                    updated.push({
+                        id: variationProduct.id,
+                        name: displayName,
+                        price: finalPrice,
+                        originalPrice: basePrice,
+                        discount: itemDiscount,
+                        qty: targetQty,
+                        maxStock: maxStock,
+                        variationName: v.name
+                    });
+                }
+
+                addedCount += 1;
+                totalItemsAdded += addQty;
+            });
+
+            return updated;
+        });
+
+        if (totalItemsAdded > 0) {
+            showToast(`${totalItemsAdded} item variasi berhasil ditambahkan! 🌸`, "✨");
+        }
+
+        setVariationProduct(null);
+        setSelectedVarQuantities({});
+    };
+
+    const handleVarQtyChange = (varName, delta, maxStock) => {
+        setSelectedVarQuantities(prev => {
+            const current = prev[varName] || 0;
+            const updated = Math.max(0, Math.min(maxStock, current + delta));
+            return {
+                ...prev,
+                [varName]: updated
+            };
+        });
     };
 
     // Adjust ticket quantities
@@ -757,62 +833,140 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                 </div>
             </div>
 
-            {/* Variation Selection Bubble Modal */}
+            {/* Variation Selection Bubble Modal (Touch & Mobile Optimized Multi-Variation Selector) */}
             {variationProduct && (
-                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4">
-                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[340px] overflow-hidden flex flex-col p-5 text-text relative">
-                        <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
+                <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-3 sm:p-4">
+                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[94vw] max-w-[420px] max-h-[88vh] overflow-hidden flex flex-col p-4 sm:p-5 text-text relative">
+                        <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-8 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
                         
-                        <div className="w-full flex justify-between items-center border-b border-text/10 pb-2.5 mb-4">
-                            <span className="font-title text-base font-bold text-center w-full">Pilih Variasi Produk</span>
+                        {/* Header Bar */}
+                        <div className="w-full flex justify-between items-center border-b border-text/15 pb-2 mb-3">
+                            <div>
+                                <span className="font-tag text-[10px] font-black uppercase tracking-wider text-pink block">Multi-Selection</span>
+                                <h3 className="font-title text-base font-bold text-text truncate max-w-[260px] sm:max-w-[300px]" title={variationProduct.name}>
+                                    {variationProduct.name}
+                                </h3>
+                            </div>
                             <button 
-                                onClick={() => setVariationProduct(null)}
-                                className="absolute right-4 text-text hover:text-pink transition-transform hover:scale-110 cursor-pointer"
+                                onClick={() => {
+                                    setVariationProduct(null);
+                                    setSelectedVarQuantities({});
+                                }}
+                                className="w-8 h-8 rounded-full border-2 border-text bg-yellow-light hover:bg-yellow flex items-center justify-center text-text hover:text-pink transition-transform hover:scale-105 cursor-pointer shadow-[1px_1px_0px_#181818]"
                             >
-                                <i className="fa-solid fa-xmark text-lg"></i>
+                                <i className="fa-solid fa-xmark text-sm"></i>
                             </button>
                         </div>
                         
-                        <h4 className="font-title text-sm font-bold text-text mb-3 text-center">{variationProduct.name}</h4>
+                        <p className="text-[11px] font-body text-text/70 mb-2.5">
+                            Tentukan jumlah tiap opsi variasi yang dibeli:
+                        </p>
 
-                        <div className="flex flex-col gap-2.5 w-full max-h-[220px] overflow-y-auto pr-1 mb-2">
+                        {/* Scrollable Variations List */}
+                        <div className="flex flex-col gap-2 w-full flex-grow overflow-y-auto pr-1 mb-3 max-h-[48vh]">
                             {variationProduct.variations.map((v, idx) => {
                                 const isOut = v.stock <= 0;
                                 const vDiscount = v.discount || 0;
                                 const vHasDiscount = vDiscount > 0;
                                 const effectiveVPrice = Math.max(0, v.price - vDiscount);
+                                const selectedQty = selectedVarQuantities[v.name] || 0;
+
                                 return (
-                                    <button
+                                    <div
                                         key={idx}
-                                        disabled={isOut}
-                                        onClick={(e) => handleAddToTicket(e, variationProduct, v)}
-                                        className={`flex justify-between items-center border-2 rounded-xl p-3 font-title text-xs text-text transition-all ${
+                                        className={`flex flex-col sm:flex-row sm:items-center justify-between border-2 rounded-xl p-2.5 gap-2 transition-all ${
                                             isOut 
-                                                ? 'bg-text/5 opacity-55 cursor-not-allowed border-text/30' 
-                                                : vHasDiscount
-                                                    ? 'bg-pink-light/30 border-pink hover:bg-pink-light cursor-pointer shadow-[2px_2px_0px_#181818] hover:translate-y-[-2px] active:translate-y-[0px] active:shadow-[1px_1px_0px_#181818]'
-                                                    : 'bg-yellow-light hover:bg-yellow cursor-pointer shadow-[2px_2px_0px_#181818] hover:translate-y-[-2px] active:translate-y-[0px] active:shadow-[1px_1px_0px_#181818]'
+                                                ? 'bg-text/5 opacity-55 border-text/30' 
+                                                : selectedQty > 0
+                                                    ? 'bg-yellow-light/40 border-text shadow-[1.5px_1.5px_0px_#181818]'
+                                                    : 'bg-white border-text/40 hover:border-text'
                                         }`}
                                     >
-                                        <div className="flex flex-col items-start">
-                                            <span className="font-bold">{v.name} {isOut && " (Habis)"}</span>
-                                            {vHasDiscount && <span className="text-[8px] bg-pink text-white px-1.5 py-0.5 rounded-full font-bold mt-0.5">SALE!</span>}
+                                        <div className="flex flex-col min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-title text-xs font-bold text-text truncate">{v.name}</span>
+                                                {isOut && <span className="text-[9px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.2 rounded border border-text/30">Habis</span>}
+                                                {vHasDiscount && <span className="text-[8px] bg-pink text-white px-1.5 py-0.2 rounded font-tag font-bold">SALE!</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-0.5 text-xs">
+                                                <span className="font-title font-bold text-pink text-xs">{formatDisplayMoney(effectiveVPrice)}</span>
+                                                {vHasDiscount && (
+                                                    <span className="text-[10px] line-through text-text/40">{formatDisplayMoney(v.price)}</span>
+                                                )}
+                                                <span className="text-[10px] text-text/60 font-mono">Sisa: {v.stock}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            {vHasDiscount ? (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] line-through opacity-50">{formatDisplayMoney(v.price)}</span>
-                                                    <span className="font-bold text-pink">{formatDisplayMoney(effectiveVPrice)}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="font-bold text-pink">{formatDisplayMoney(v.price)}</span>
-                                            )}
-                                            <span className="bg-white border border-text/30 px-1.5 py-0.5 rounded text-[10px]">Stok: {v.stock}</span>
+
+                                        {/* Stepper Controls (Touch friendly) */}
+                                        <div className="flex items-center justify-end gap-2 shrink-0 self-end sm:self-center">
+                                            <button
+                                                type="button"
+                                                disabled={isOut || selectedQty <= 0}
+                                                onClick={() => handleVarQtyChange(v.name, -1, v.stock)}
+                                                className={`w-8 h-8 rounded-lg border-2 border-text font-title font-black flex items-center justify-center text-sm transition-all ${
+                                                    selectedQty > 0 
+                                                        ? 'bg-pink text-text shadow-[1px_1px_0px_#181818] active:translate-y-[1px] cursor-pointer' 
+                                                        : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed opacity-50'
+                                                }`}
+                                            >
+                                                -
+                                            </button>
+                                            <span className="w-8 text-center font-title font-bold text-sm text-text select-none">
+                                                {selectedQty}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                disabled={isOut || selectedQty >= v.stock}
+                                                onClick={() => handleVarQtyChange(v.name, 1, v.stock)}
+                                                className={`w-8 h-8 rounded-lg border-2 border-text font-title font-black flex items-center justify-center text-sm transition-all ${
+                                                    !isOut && selectedQty < v.stock
+                                                        ? 'bg-yellow text-text shadow-[1px_1px_0px_#181818] active:translate-y-[1px] cursor-pointer' 
+                                                        : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed opacity-50'
+                                                }`}
+                                            >
+                                                +
+                                            </button>
                                         </div>
-                                    </button>
+                                    </div>
                                 );
                             })}
                         </div>
+
+                        {/* Sticky Action Footer */}
+                        {(() => {
+                            const totalSelectedQty = Object.values(selectedVarQuantities).reduce((sum, q) => sum + (q || 0), 0);
+                            const totalSelectedPrice = variationProduct.variations.reduce((sum, v) => {
+                                const q = selectedVarQuantities[v.name] || 0;
+                                const effPrice = Math.max(0, (v.price || 0) - (v.discount || 0));
+                                return sum + (effPrice * q);
+                            }, 0);
+
+                            return (
+                                <div className="border-t-2 border-dashed border-text/20 pt-2.5 mt-auto flex flex-col gap-2">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="font-tag font-bold uppercase text-[10px] text-text/70">
+                                            {totalSelectedQty} Item Dipilih
+                                        </span>
+                                        <span className="font-title font-bold text-sm text-pink">
+                                            {formatDisplayMoney(totalSelectedPrice)}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={totalSelectedQty <= 0}
+                                        onClick={handleBatchAddVariations}
+                                        className={`w-full py-2.5 rounded-xl border-2 border-text font-title font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                                            totalSelectedQty > 0
+                                                ? 'bg-pink text-text shadow-[2px_2px_0px_#181818] hover:bg-white active:translate-y-[1px] active:shadow-none cursor-pointer'
+                                                : 'bg-gray-200 text-gray-400 border-gray-400 cursor-not-allowed opacity-60'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-cart-plus"></i>
+                                        <span>+ Masukkan ke Keranjang</span>
+                                    </button>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
