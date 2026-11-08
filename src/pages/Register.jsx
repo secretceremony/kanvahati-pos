@@ -24,6 +24,9 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     const [variationProduct, setVariationProduct] = useState(null);
     const [selectedVarQuantities, setSelectedVarQuantities] = useState({});
 
+    // Multiplier for single item quick addition (e.g. 1x, 2x, 5x, 10x)
+    const [quickMultiplier, setQuickMultiplier] = useState(1);
+
     // Mobile layout toggle state
     const [activeMobileTab, setActiveMobileTab] = useState('catalog');
 
@@ -113,26 +116,30 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         }
 
         const existing = ticket.find(item => item.id === product.id && item.variationName === varName);
+        const addAmount = Math.max(1, quickMultiplier || 1);
+
         if (existing) {
+            const nextQty = Math.min(maxStock, existing.qty + addAmount);
             if (existing.qty < maxStock) {
-                showToast(`"${displayName}" ${t.increased}`, "✨");
+                showToast(`"${displayName}" (+${addAmount})`, "✨");
                 setTicket(prev => prev.map(item => 
                     (item.id === product.id && item.variationName === varName) 
-                        ? { ...item, qty: item.qty + 1 } 
+                        ? { ...item, qty: nextQty } 
                         : item
                 ));
             } else {
                 showToast(t.stockOut, "⚠️");
             }
         } else {
-            showToast(`"${displayName}" ${t.added}`, "🌸");
+            const initialQty = Math.min(maxStock, addAmount);
+            showToast(`"${displayName}" (${initialQty} pcs) ${t.added}`, "🌸");
             setTicket(prev => [...prev, {
                 id: product.id,
                 name: displayName,
                 price: finalPrice,
                 originalPrice: basePrice,
                 discount: itemDiscount,
-                qty: 1,
+                qty: initialQty,
                 maxStock: maxStock,
                 variationName: varName
             }]);
@@ -589,18 +596,39 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         />
                     </div>
                     
-                    <div className="category-filters flex flex-nowrap overflow-x-auto pb-1.5 gap-2 scrollbar-none -mx-1 px-1">
-                        {['all', ...categories].map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={`filter-btn font-tag text-[11px] font-extrabold uppercase border-2 border-text rounded-md px-3 py-1 text-text cursor-pointer transition-all shrink-0 whitespace-nowrap shadow-[1.5px_1.5px_0px_#181818] ${
-                                    activeCategory === cat ? 'bg-yellow' : 'bg-white hover:bg-yellow-light'
-                                }`}
-                            >
-                                {getCategoryDisplayLabel(cat)}
-                            </button>
-                        ))}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="category-filters flex flex-nowrap overflow-x-auto pb-1.5 gap-2 scrollbar-none -mx-1 px-1 flex-grow">
+                            {['all', ...categories].map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setActiveCategory(cat)}
+                                    className={`filter-btn font-tag text-[11px] font-extrabold uppercase border-2 border-text rounded-md px-3 py-1 text-text cursor-pointer transition-all shrink-0 whitespace-nowrap shadow-[1.5px_1.5px_0px_#181818] ${
+                                        activeCategory === cat ? 'bg-yellow' : 'bg-white hover:bg-yellow-light'
+                                    }`}
+                                >
+                                    {getCategoryDisplayLabel(cat)}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Quick Qty Multiplier for Single items */}
+                        <div className="flex items-center gap-1 shrink-0 bg-white border-2 border-text rounded-xl p-1 shadow-[1.5px_1.5px_0px_#181818] self-start sm:self-auto">
+                            <span className="font-tag text-[9.5px] font-black uppercase text-text/70 px-1.5">Qty:</span>
+                            {[1, 2, 3, 5].map(num => (
+                                <button
+                                    key={num}
+                                    type="button"
+                                    onClick={() => setQuickMultiplier(num)}
+                                    className={`px-2 py-0.5 rounded-lg border font-title font-bold text-xs transition-all cursor-pointer ${
+                                        quickMultiplier === num 
+                                            ? 'bg-pink text-text border-text shadow-[1px_1px_0px_#181818]' 
+                                            : 'bg-white text-text/70 border-transparent hover:text-text'
+                                    }`}
+                                >
+                                    +{num}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
