@@ -201,36 +201,72 @@ export default function Rekapan({ showToast }) {
         ];
         XLSX.utils.book_append_sheet(wb, wsDetail, 'Detail Transaksi');
 
-        // Sheet 3: Detail Barang
-        const itemHeader = ['ID Pesanan', 'Kode Barang', 'Nama Barang', 'Variasi', 'Qty', 'Harga Satuan (Rp)', 'Diskon (Rp)', 'Subtotal (Rp)'];
+        // Sheet 3: Detail Barang (Net Bersih setelah seluruh diskon promo dibagikan per item)
+        const itemHeader = ['ID Pesanan', 'Kode Barang', 'Nama Barang', 'Variasi', 'Qty', 'Harga Asli/Pcs (Rp)', 'Diskon/Pcs (Rp)', 'Harga Net/Pcs (Rp)', 'Subtotal Bersih (Rp)'];
         const itemRows = [];
         group.transactions.forEach(tx => {
-            tx.items.forEach(item => {
+            const paid = tx.total || 0;
+            const rawItemsSum = tx.items.reduce((sum, item) => sum + ((item.originalPrice || item.price || 0) * (item.qty || 1)), 0);
+            const txTotalDiscount = Math.max(0, rawItemsSum - paid);
+
+            let allocatedDiscount = 0;
+            tx.items.forEach((item, idx) => {
+                const qty = item.qty || 1;
+                const origPrice = item.originalPrice || item.price || 0;
+                const itemRawSub = origPrice * qty;
+
+                let itemDiscount = 0;
+                if (idx === tx.items.length - 1) {
+                    itemDiscount = txTotalDiscount - allocatedDiscount;
+                } else {
+                    itemDiscount = rawItemsSum > 0 ? Math.round((itemRawSub / rawItemsSum) * txTotalDiscount) : 0;
+                    allocatedDiscount += itemDiscount;
+                }
+
+                const netSubtotal = itemRawSub - itemDiscount;
+                const discPerPcs = Math.round(itemDiscount / qty);
+                const netUnitPrice = origPrice - discPerPcs;
+
                 itemRows.push([
                     tx.id,
                     item.id,
                     item.name || '-',
                     item.variationName || '-',
-                    item.qty,
-                    item.originalPrice || item.price,
-                    item.discount || 0,
-                    (item.price || 0) * item.qty
+                    qty,
+                    origPrice,
+                    discPerPcs,
+                    netUnitPrice,
+                    netSubtotal
                 ]);
             });
         });
         const wsItems = XLSX.utils.aoa_to_sheet([itemHeader, ...itemRows]);
         wsItems['!cols'] = [
-            { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 6 }, { wch: 18 }, { wch: 14 }, { wch: 16 }
+            { wch: 14 }, { wch: 14 }, { wch: 26 }, { wch: 16 }, { wch: 6 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 18 }
         ];
         XLSX.utils.book_append_sheet(wb, wsItems, 'Detail Barang');
 
-        // Sheet 4: Produk Terlaris
-        const topHeader = ['Nama Produk', 'Qty Terjual', 'Total Pendapatan (Rp)'];
-        const topRows = Object.entries(group.topProducts)
-            .sort((a, b) => b[1].qty - a[1].qty)
+        // Sheet 4: Produk Terlaris (Berdasarkan Pendapatan Bersih Riil)
+        const topHeader = ['Nama Produk', 'Qty Terjual', 'Total Pendapatan Bersih (Rp)'];
+        const prodNetMap = {};
+        itemRows.forEach(row => {
+            const pname = row[2];
+            const vname = row[3];
+            const fullName = (!vname || vname === '-') ? pname : (pname.includes(`(${vname})`) ? pname : `${pname} (${vname})`);
+            const qty = row[4] || 0;
+            const netSub = row[8] || 0;
+            if (!prodNetMap[fullName]) {
+                prodNetMap[fullName] = { qty: 0, revenue: 0 };
+            }
+            prodNetMap[fullName].qty += qty;
+            prodNetMap[fullName].revenue += netSub;
+        });
+
+        const topRows = Object.entries(prodNetMap)
+            .sort((a, b) => b[1].qty - a[1].qty || b[1].revenue - a[1].revenue)
             .map(([name, data]) => [name, data.qty, data.revenue]);
         const wsTop = XLSX.utils.aoa_to_sheet([topHeader, ...topRows]);
-        wsTop['!cols'] = [{ wch: 28 }, { wch: 14 }, { wch: 22 }];
+        wsTop['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 25 }];
         XLSX.utils.book_append_sheet(wb, wsTop, 'Produk Terlaris');
 
         // Generate filename
