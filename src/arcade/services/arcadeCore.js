@@ -49,9 +49,9 @@ export function pickRandomQuestion(questionsList, excludeIds = []) {
 }
 
 /**
- * Transition: Prepare session with selected game and participant (READY)
+ * Transition: Prepare session with selected game, difficulty, quizMode, and participant (READY)
  */
-export function prepareSession(session, gameId, question, participantTag) {
+export function prepareSession(session, gameId, question, participantTag, options = {}) {
     if (session.status === SESSION_STATES.PLAYING) {
         throw new Error("CANNOT_PREPARE: Sesi permainan masih berlangsung!");
     }
@@ -61,15 +61,26 @@ export function prepareSession(session, gameId, question, participantTag) {
         throw new Error(`UNKNOWN_GAME: Challenge '${gameId}' tidak ditemukan!`);
     }
 
+    const difficulty = options.difficulty || 'normal';
+    const quizMode = options.quizMode || 'classic';
+    const resolvedTarget = Number.isFinite(options.targetCount)
+        ? options.targetCount
+        : (question?.targetCount || gameDef.targetCount);
+    const resolvedTimer = Number.isFinite(options.timerDurationSec)
+        ? options.timerDurationSec
+        : (gameDef.timeLimitSec || ARCADE_GLOBAL_RULES.TIME_LIMIT_SECONDS);
+
     return {
         ...session,
         status: SESSION_STATES.READY,
         gameId,
         gameTitle: gameDef.title,
+        difficulty,
+        quizMode,
         question,
         currentProgress: 0,
-        targetProgress: gameDef.targetCount,
-        timerDurationSec: gameDef.timeLimitSec,
+        targetProgress: resolvedTarget,
+        timerDurationSec: resolvedTimer,
         startedAtMs: null,
         endsAtMs: null,
         participantTag: participantTag || 'Peserta #01',

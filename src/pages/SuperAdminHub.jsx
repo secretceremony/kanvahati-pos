@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { fetchAuditLogs } from '../services/audit';
+import { useState, useEffect, useCallback } from 'react';
+import jsQR from 'jsqr';
+import { fetchAuditLogs, recordAuditLog } from '../services/audit';
 import { fetchAllStaffRoles, assignStaffRole, removeStaffRole, seedDesignatedStaff, registerAuthUser } from '../services/staffRoles';
+import { getQrisConfig, saveQrisConfig } from '../services/db';
+import { validateQrisPayload, extractQrisInfo, buildDynamicQris, DEFAULT_STATIC_QRIS_PAYLOAD } from '../utils/qris';
 
 export default function SuperAdminHub({ currentUser, userRole, showToast }) {
-    const [activeTab, setActiveTab] = useState('staff'); // 'staff' | 'audit'
+    const [activeTab, setActiveTab] = useState('staff'); // 'staff' | 'audit' | 'qris'
     
     // Staff roles state
     const [staffList, setStaffList] = useState([]);
@@ -17,7 +20,21 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
     const [auditFilter, setAuditFilter] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
-    const loadStaff = async () => {
+    // QRIS configuration state
+    const [qrisForm, setQrisForm] = useState({
+        mode: 'emv_dynamic',
+        staticPayload: DEFAULT_STATIC_QRIS_PAYLOAD,
+        merchantName: 'silvxeri',
+        danaProxyUrl: '',
+        merchantId: '',
+        storeId: '',
+        subMerchantId: '',
+        terminalId: ''
+    });
+    const [qrisSaving, setQrisSaving] = useState(false);
+    const [qrisDecodeMsg, setQrisDecodeMsg] = useState('');
+
+    const loadStaff = useCallback(async () => {
         setStaffLoading(true);
         try {
             const list = await fetchAllStaffRoles();
@@ -28,9 +45,9 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
         } finally {
             setStaffLoading(false);
         }
-    };
+    }, [showToast]);
 
-    const loadAudit = async () => {
+    const loadAudit = useCallback(async () => {
         setAuditLoading(true);
         try {
             const logs = await fetchAuditLogs(150);
@@ -41,12 +58,33 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
         } finally {
             setAuditLoading(false);
         }
-    };
+    }, [showToast]);
 
     useEffect(() => {
-        loadStaff();
-        loadAudit();
-    }, []);
+        let mounted = true;
+        (async () => {
+            try {
+                const [staff, logs, cfg] = await Promise.all([
+                    fetchAllStaffRoles(),
+                    fetchAuditLogs(150),
+                    getQrisConfig(true)
+                ]);
+                if (!mounted) return;
+                setStaffList(staff);
+                setAuditLogs(logs);
+                setQrisForm(cfg);
+            } catch (e) {
+                console.error(e);
+                showToast("Gagal memuat data Admin Hub", "⚠️");
+            } finally {
+                if (mounted) {
+                    setStaffLoading(false);
+                    setAuditLoading(false);
+                }
+            }
+        })();
+        return () => { mounted = false; };
+    }, [showToast]);
 
     const handleSaveStaff = async (e) => {
         e.preventDefault();
@@ -119,6 +157,78 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
         return matchesType && matchesSearch;
     });
 
+    const handleSaveQrisConfig = async (e) => {
+        e.preventDefault();
+        if (qrisForm.mode !== 'static_image') {
+            const check = validateQrisPayload(qrisForm.staticPayload);
+            if (!check.valid) {
+                showToast(`Payload QRIS tidak valid: ${check.reason}`, "⚠️");
+                return;
+            }
+        }
+        setQrisSaving(true);
+        try {
+            const saved = await saveQrisConfig(qrisForm);
+            setQrisForm(saved);
+            await recordAuditLog({
+                action: 'QRIS_CONFIG_CHANGE',
+                summary: `Konfigurasi QRIS diperbarui ke mode "${saved.mode}" (${saved.merchantName})`,
+                actor: {
+                    uid: currentUser?.uid,
+                    email: currentUser?.email,
+                    displayName: currentUser?.displayName || 'Super Admin',
+                    role: userRole
+                },
+                details: { mode: saved.mode, merchantName: saved.merchantName, hasDanaProxy: Boolean(saved.danaProxyUrl) }
+            });
+            showToast("Konfigurasi Dynamic QRIS berhasil disimpan!", "✨");
+        } catch (err) {
+            console.error(err);
+            showToast("Gagal menyimpan konfigurasi QRIS", "⚠️");
+        } finally {
+            setQrisSaving(false);
+        }
+    };
+
+    const handleDecodeQrisImage = (file) => {
+        if (!file) return;
+        setQrisDecodeMsg('Membaca kode QR dari gambar...');
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const img = new Image();
+            img.onload = () => {
+                const maxDim = 900;
+                const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const decoded = jsQR(imgData.data, canvas.width, canvas.height);
+                if (!decoded || !decoded.data) {
+                    setQrisDecodeMsg('Tidak dapat membaca QR dari gambar tersebut.');
+                    showToast('QR gagal terbaca dari gambar', '⚠️');
+                    return;
+                }
+                const check = validateQrisPayload(decoded.data);
+                if (!check.valid) {
+                    setQrisDecodeMsg(`QR terbaca tetapi bukan QRIS EMVCo valid: ${check.reason}`);
+                    return;
+                }
+                setQrisForm(prev => ({
+                    ...prev,
+                    staticPayload: decoded.data,
+                    merchantName: check.info.merchantName || prev.merchantName
+                }));
+                setQrisDecodeMsg(`Berhasil! Merchant: ${check.info.merchantName} (${check.info.acquirerDomain || 'QRIS'})`);
+                showToast(`QRIS terbaca: ${check.info.merchantName}`, '✅');
+            };
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
     const getActionBadgeColor = (action) => {
         switch (action) {
             case 'PRICE_CHANGE': return 'bg-yellow-light text-text border-text';
@@ -169,6 +279,17 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                         }`}
                     >
                         <i className="fa-solid fa-receipt mr-1"></i> Jejak Audit ({auditLogs.length})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('qris')}
+                        className={`px-4 py-1.5 rounded-full cursor-pointer transition-all ${
+                            activeTab === 'qris' 
+                                ? 'bg-yellow text-text border-2 border-text shadow-[2px_2px_0px_#181818]' 
+                                : 'text-text hover:bg-white border-2 border-transparent'
+                        }`}
+                    >
+                        <i className="fa-solid fa-qrcode mr-1"></i> Dynamic QRIS
                     </button>
                 </div>
             </div>
@@ -515,6 +636,163 @@ export default function SuperAdminHub({ currentUser, userRole, showToast }) {
                     </div>
                 </div>
             )}
+            {/* TAB 3: KONFIGURASI DYNAMIC QRIS & DANA SNAP */}
+            {activeTab === 'qris' && (() => {
+                const validation = validateQrisPayload(qrisForm.staticPayload);
+                let sampleDynamic = '';
+                try {
+                    if (validation.valid) sampleDynamic = buildDynamicQris(qrisForm.staticPayload, 50000, 'KH-SAMPLE');
+                } catch {
+                    sampleDynamic = '';
+                }
+                const info = validation.valid ? extractQrisInfo(qrisForm.staticPayload) : null;
+
+                return (
+                    <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-5 items-start">
+                        <form onSubmit={handleSaveQrisConfig} className="bg-white border-[3px] border-text rounded-2xl shadow-pop overflow-hidden">
+                            <div className="retro-window-header bg-blue">
+                                <div className="retro-dots">
+                                    <span className="retro-dot retro-dot-red"></span>
+                                    <span className="retro-dot retro-dot-yellow"></span>
+                                    <span className="retro-dot retro-dot-blue"></span>
+                                    <span className="font-tag text-[10px] font-black uppercase tracking-wider text-text ml-1.5">Konfigurasi QRIS Dinamis</span>
+                                </div>
+                                <span className="text-[10px] font-tag font-black uppercase bg-yellow px-2 py-0.5 rounded border border-text">system/qris</span>
+                            </div>
+
+                            <div className="p-5 flex flex-col gap-4">
+                                <div>
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1">Mode Pembayaran QRIS</label>
+                                    <select
+                                        value={qrisForm.mode}
+                                        onChange={(e) => setQrisForm(prev => ({ ...prev, mode: e.target.value }))}
+                                        className="w-full bg-white border-2 border-text rounded-xl px-3 py-2 text-sm font-bold cursor-pointer"
+                                    >
+                                        <option value="emv_dynamic">EMVCo Dynamic QRIS (Client-Side dari QRIS DANA Merchant — Langsung Aktif)</option>
+                                        <option value="dana_snap">DANA SNAP API Acquirer (/v1.0/qr/qr-mpm-generate.htm via Proxy)</option>
+                                        <option value="static_image">Gambar Statis (/qris.png)</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 gap-2 flex-wrap">
+                                        <label className="text-[11px] font-bold uppercase tracking-wider">Payload QRIS Statis Merchant (EMVCo)</label>
+                                        <label className="bg-yellow hover:bg-yellow-light border border-text rounded-lg px-2.5 py-0.5 text-[10.5px] font-title font-bold cursor-pointer">
+                                            <i className="fa-solid fa-upload mr-1"></i> Scan dari Gambar QRIS
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => handleDecodeQrisImage(e.target.files?.[0])}
+                                            />
+                                        </label>
+                                    </div>
+                                    <textarea
+                                        rows={3}
+                                        value={qrisForm.staticPayload}
+                                        onChange={(e) => setQrisForm(prev => ({ ...prev, staticPayload: e.target.value }))}
+                                        className="w-full bg-yellow-light/20 border-2 border-text rounded-xl p-2.5 text-xs font-mono outline-none focus:bg-white"
+                                    />
+                                    {qrisDecodeMsg && (
+                                        <p className="text-[11px] font-bold text-blue mt-1">{qrisDecodeMsg}</p>
+                                    )}
+                                    <div className={`mt-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                                        validation.valid ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 'bg-rose-50 border-rose-500 text-rose-800'
+                                    }`}>
+                                        {validation.valid
+                                            ? `Valid EMVCo CRC16 • Merchant: ${info.merchantName} • Kota: ${info.merchantCity} • Acquirer: ${info.acquirerDomain || '-'}`
+                                            : `Tidak valid: ${validation.reason}`}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1">Nama Tampil Merchant</label>
+                                    <input
+                                        type="text"
+                                        value={qrisForm.merchantName}
+                                        onChange={(e) => setQrisForm(prev => ({ ...prev, merchantName: e.target.value }))}
+                                        className="w-full bg-white border-2 border-text rounded-xl px-3 py-2 text-sm font-bold"
+                                    />
+                                </div>
+
+                                {qrisForm.mode === 'dana_snap' && (
+                                    <div className="bg-blue-light/30 border-2 border-text rounded-xl p-3.5 flex flex-col gap-3">
+                                        <div className="text-xs font-bold text-text">
+                                            Parameter DANA SNAP Acquirer (Memerlukan Backend Proxy yang memegang RSA-2048 Private Key)
+                                        </div>
+                                        <input
+                                            type="url"
+                                            placeholder="Proxy Base URL (contoh: https://api.kanvahati.id/dana)"
+                                            value={qrisForm.danaProxyUrl}
+                                            onChange={(e) => setQrisForm(prev => ({ ...prev, danaProxyUrl: e.target.value }))}
+                                            className="w-full bg-white border-2 border-text rounded-xl px-3 py-2 text-xs font-mono"
+                                        />
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            <input
+                                                type="text"
+                                                placeholder="merchantId"
+                                                value={qrisForm.merchantId}
+                                                onChange={(e) => setQrisForm(prev => ({ ...prev, merchantId: e.target.value }))}
+                                                className="bg-white border-2 border-text rounded-xl px-3 py-2 text-xs font-mono"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="storeId"
+                                                value={qrisForm.storeId}
+                                                onChange={(e) => setQrisForm(prev => ({ ...prev, storeId: e.target.value }))}
+                                                className="bg-white border-2 border-text rounded-xl px-3 py-2 text-xs font-mono"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="subMerchantId (opsional)"
+                                                value={qrisForm.subMerchantId}
+                                                onChange={(e) => setQrisForm(prev => ({ ...prev, subMerchantId: e.target.value }))}
+                                                className="bg-white border-2 border-text rounded-xl px-3 py-2 text-xs font-mono"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="terminalId (opsional)"
+                                                value={qrisForm.terminalId}
+                                                onChange={(e) => setQrisForm(prev => ({ ...prev, terminalId: e.target.value }))}
+                                                className="bg-white border-2 border-text rounded-xl px-3 py-2 text-xs font-mono"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={qrisSaving}
+                                    className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-xs py-2.5 px-6 shadow-btn hover:bg-white cursor-pointer font-bold"
+                                >
+                                    {qrisSaving ? 'Menyimpan...' : 'Simpan Konfigurasi QRIS'}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div className="bg-yellow-light/40 border-[3px] border-text rounded-2xl shadow-card p-5 flex flex-col gap-3">
+                            <h4 className="font-title text-base font-bold text-text flex items-center gap-2">
+                                <i className="fa-solid fa-circle-info text-pink"></i>
+                                <span>Ringkasan Cara Kerja Dynamic QRIS</span>
+                            </h4>
+                            <p className="text-xs text-text/80 leading-relaxed">
+                                1. Mode <strong>EMVCo Dynamic QRIS</strong> mengubah QRIS statis merchant (DANA: <code>{info?.nmid || 'ID1025404604064'}</code>) menjadi QR dinamis ber-nominal otomatis (Tag <code>01=12</code>, Tag <code>54=nominal</code>, CRC16 baru). Pembeli tidak perlu mengetik angka manual.
+                            </p>
+                            <p className="text-xs text-text/80 leading-relaxed">
+                                2. Mode <strong>DANA SNAP API</strong> menggunakan kontrak resmi DANA <code>POST /v1.0/qr/qr-mpm-generate.htm</code> dan <code>POST /rest/v1.1/debit/status</code> lewat backend proxy pemegang kunci RSA-2048 (dengan fallback otomatis ke EMVCo Dynamic bila offline).
+                            </p>
+                            {sampleDynamic && (
+                                <div className="bg-white border-2 border-text rounded-xl p-3">
+                                    <span className="text-[10px] font-tag font-extrabold uppercase text-text/60 block mb-1">
+                                        Contoh Output Dinamis (Rp 50.000):
+                                    </span>
+                                    <code className="text-[10.5px] font-mono break-all text-text/85">{sampleDynamic}</code>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

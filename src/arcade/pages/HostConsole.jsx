@@ -1,19 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { GAME_DEFINITIONS, ARCADE_GLOBAL_RULES } from '../data/gameConfig.js';
+import { GAME_DEFINITIONS, QUIZ_DIFFICULTIES, QUIZ_MODES, DEFAULT_EVENT_ARCADE_CONFIG, resolveQuizModeParams } from '../data/gameConfig.js';
 import { 
     getQuestions, 
     getQuestionSecret, 
     updateSessionState, 
     checkParticipantStatus,
-    registerParticipantAtomic,
     startSessionAtomic, 
     recordGameOutcome, 
     claimSketchPrize,
     claimStickerPrize,
     seedQuestionBankIfEmpty,
     subscribeEventParticipants,
-    claimSketchPrizeByKey 
+    claimSketchPrizeByKey,
+    getEventArcadeConfig,
+    saveEventArcadeConfig,
+    computeArcadeQuotaStatus
 } from '../services/arcadeDb.js';
 import { 
     createIdleSession, 
@@ -42,10 +44,15 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
 
     // 3. Challenge & Question Selection State
     const [selectedGameId, setSelectedGameId] = useState('G01');
+    const [selectedDifficulty, setSelectedDifficulty] = useState('normal'); // 'easy' | 'normal' | 'hard'
+    const [selectedQuizMode, setSelectedQuizMode] = useState('classic');  // 'classic' | 'speed_round' | 'boss_question'
     const [questionsPool, setQuestionsPool] = useState([]);
+    const [usedQuestionIds, setUsedQuestionIds] = useState([]);
     const [currentQuestion, setCurrentQuestion] = useState(null);
     const [secretData, setSecretData] = useState(null);
     const [loadingQuestions, setLoadingQuestions] = useState(true);
+    const [eventConfig, setEventConfig] = useState(DEFAULT_EVENT_ARCADE_CONFIG);
+    const [savingEventConfig, setSavingEventConfig] = useState(false);
 
     // 4. Session State & Timer
     const [session, setSession] = useState(() => createIdleSession('CF20', 'station-1'));
@@ -68,8 +75,9 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
     // Check Role-Based Access: Must be super_admin, admin, or arcade_host
     const hasHostAccess = userRole === 'admin' || userRole === 'super_admin' || userRole === 'arcade_host';
 
-    // Subscribe to played participants for current event
+    // Subscribe to played participants for current event & load event config
     useEffect(() => {
+        getEventArcadeConfig(eventId).then(setEventConfig).catch(() => {});
         const unsubscribe = subscribeEventParticipants(
             eventId,
             (list) => {
@@ -84,6 +92,9 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
         };
     }, [eventId]);
 
+    const quotaStatus = computeArcadeQuotaStatus(playedParticipants, eventConfig);
+    const modeParams = resolveQuizModeParams(GAME_DEFINITIONS[selectedGameId], selectedDifficulty, selectedQuizMode);
+
     // Handler: Direct Claim Live Sketch from Table
     const handleClaimSketchDirect = async (participantKey) => {
         try {
@@ -94,6 +105,42 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
             showToast?.(e.message || "Gagal mengklaim hadiah", "⚠️");
         }
     };
+
+    // Helper: Push READY state preview to Display
+    const syncReadyStateToDisplay = useCallback(async (q = currentQuestion, gId = selectedGameId, diff = selectedDifficulty, qMode = selectedQuizMode) => {
+        if (!q || session.status === SESSION_STATES.PLAYING) return;
+        try {
+            const nextRev = sessionRevision + 1;
+            setSessionRevision(nextRev);
+            const participantTag = displayName.trim() || rawIdentifier.trim() || "Pengunjung Booth";
+            const resolved = resolveQuizModeParams(GAME_DEFINITIONS[gId], diff, qMode);
+            await updateSessionState(eventId, stationId, {
+                sessionId: sessionId || `ready_${Date.now()}`,
+                revision: nextRev,
+                status: SESSION_STATES.READY,
+                gameId: gId,
+                gameTitle: GAME_DEFINITIONS[gId]?.title,
+                difficulty: resolved.difficulty,
+                quizMode: resolved.quizMode,
+                displayPrompt: q.displayPrompt,
+                mediaUrl: q.mediaUrl || null,
+                revealedMediaUrl: null,
+                displayItems: q.options || null,
+                trait: q.trait || null,
+                letter: q.letter || null,
+                characterName: q.characterName || null,
+                phrasePrompt: q.phrasePrompt || null,
+                cardReferenceCode: q.cardReferenceCode || null,
+                currentProgress: 0,
+                targetProgress: resolved.targetCount || q.targetCount || GAME_DEFINITIONS[gId]?.targetCount || 1,
+                timerDurationSec: resolved.timerDurationSec,
+                participantDisplayTag: participantTag,
+                result: null
+            });
+        } catch (e) {
+            console.warn("Sync ready preview failed:", e);
+        }
+    }, [currentQuestion, selectedGameId, selectedDifficulty, selectedQuizMode, session.status, sessionRevision, displayName, rawIdentifier, eventId, stationId, sessionId]);
 
     // Load questions on mount or game change
     useEffect(() => {
@@ -111,9 +158,6 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                         if (randomQ) {
                             const sec = await getQuestionSecret(randomQ.id);
                             setSecretData(sec);
-                            if (session.status === SESSION_STATES.IDLE || session.status === SESSION_STATES.READY) {
-                                syncReadyStateToDisplay(randomQ, selectedGameId);
-                            }
                         }
                     }
                 }
@@ -127,7 +171,9 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
 
         loadGameData();
         return () => { isMounted = false; };
-    }, [selectedGameId]);
+    }, [selectedGameId, showToast]);
+
+    const timeoutFnRef = useRef(null);
 
     // Timer countdown effect during PLAYING state
     useEffect(() => {
@@ -142,20 +188,17 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
 
                 if (remaining <= 0) {
                     clearInterval(timerIntervalRef.current);
-                    handleSessionTimeout();
+                    timeoutFnRef.current?.();
                 }
             }, 150);
-        } else {
-            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-            if (session.status === SESSION_STATES.IDLE || session.status === SESSION_STATES.READY) {
-                setRemainingSeconds(session.timerDurationSec || 30);
-            }
+        } else if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
         }
 
         return () => {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         };
-    }, [session.status, session.startedAtMs]);
+    }, [session.status, session.startedAtMs, session.timerDurationSec]);
 
     // Handler: Check participant eligibility
     const handleCheckParticipant = async () => {
@@ -181,45 +224,14 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
         }
     };
 
-    // Helper: Push READY state preview to Display
-    const syncReadyStateToDisplay = async (q = currentQuestion, gId = selectedGameId) => {
-        if (!q || session.status === SESSION_STATES.PLAYING) return;
-        try {
-            const nextRev = sessionRevision + 1;
-            setSessionRevision(nextRev);
-            const participantTag = displayName.trim() || rawIdentifier.trim() || "Pengunjung Booth";
-            await updateSessionState(eventId, stationId, {
-                sessionId: sessionId || `ready_${Date.now()}`,
-                revision: nextRev,
-                status: SESSION_STATES.READY,
-                gameId: gId,
-                gameTitle: GAME_DEFINITIONS[gId]?.title,
-                displayPrompt: q.displayPrompt,
-                mediaUrl: q.mediaUrl || null,
-                revealedMediaUrl: null,
-                displayItems: q.options || null,
-                trait: q.trait || null,
-                letter: q.letter || null,
-                characterName: q.characterName || null,
-                phrasePrompt: q.phrasePrompt || null,
-                cardReferenceCode: q.cardReferenceCode || null,
-                currentProgress: 0,
-                targetProgress: q.targetCount || GAME_DEFINITIONS[gId]?.targetCount || 1,
-                timerDurationSec: 30,
-                participantDisplayTag: participantTag,
-                result: null
-            });
-        } catch (e) {
-            console.warn("Sync ready preview failed:", e);
-        }
-    };
-
-    // Handler: Randomize question within current challenge
+    // Handler: Randomize question within current challenge (avoids repeating used questions)
     const handlePickRandomQuestion = async () => {
         if (questionsPool.length === 0 || session.status === SESSION_STATES.PLAYING) return;
-        const nextQ = pickRandomQuestion(questionsPool, currentQuestion ? [currentQuestion.id] : []);
+        const excludeSet = new Set([...usedQuestionIds, ...(currentQuestion ? [currentQuestion.id] : [])]);
+        const nextQ = pickRandomQuestion(questionsPool, Array.from(excludeSet));
         if (nextQ) {
             setCurrentQuestion(nextQ);
+            setUsedQuestionIds(prev => (prev.length >= questionsPool.length ? [nextQ.id] : Array.from(new Set([...prev, nextQ.id]))));
             const sec = await getQuestionSecret(nextQ.id);
             setSecretData(sec);
             showToast?.(`Soal diacak: ${nextQ.id}`, "🎲");
@@ -257,8 +269,8 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
             showToast?.("Wajib mengisi identitas peserta sebelum memulai!", "⚠️");
             return;
         }
-        if (participantStatus?.hasPlayed) {
-            showToast?.("Peserta ini sudah pernah bermain pada event ini!", "🚫");
+        if (participantStatus?.hasPlayed && (participantStatus?.record?.playCount || 1) >= (eventConfig?.maxPlaysPerParticipant || 1)) {
+            showToast?.(`Peserta ini sudah mencapai batas bermain (${eventConfig?.maxPlaysPerParticipant || 1}x) pada event ini!`, "🚫");
             return;
         }
         if (!currentQuestion) {
@@ -270,7 +282,12 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
         try {
             const participantTag = displayName.trim() || rawIdentifier.trim();
             const now = Date.now();
-            const prep = prepareSession(session, selectedGameId, currentQuestion, participantTag);
+            const prep = prepareSession(session, selectedGameId, currentQuestion, participantTag, {
+                difficulty: modeParams.difficulty,
+                quizMode: modeParams.quizMode,
+                timerDurationSec: modeParams.timerDurationSec,
+                targetCount: modeParams.targetCount
+            });
             const started = startSession(prep, now);
             const newSessionId = `sess_${now}_${Math.random().toString(36).substring(2, 7)}`;
             const rev = 1;
@@ -279,6 +296,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
             setSessionRevision(rev);
             setSession(started);
             setRemainingSeconds(started.timerDurationSec || 30);
+            setUsedQuestionIds(prev => Array.from(new Set([...prev, currentQuestion.id])));
             setSketchClaimed(false);
             setStickerClaimed(false);
 
@@ -293,8 +311,11 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                     sessionId: newSessionId,
                     revision: rev,
                     status: SESSION_STATES.PLAYING,
+                    mode: 'quiz',
                     gameId: selectedGameId,
                     gameTitle: started.gameTitle,
+                    difficulty: modeParams.difficulty,
+                    quizMode: modeParams.quizMode,
                     displayPrompt: currentQuestion.displayPrompt,
                     mediaUrl: currentQuestion.mediaUrl || null,
                     revealedMediaUrl: currentQuestion.revealedMediaUrl || null,
@@ -312,7 +333,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                 }
             );
 
-            showToast?.("Permainan DIMULAI! Timer 30 detik aktif.", "⏱️");
+            showToast?.(`Permainan DIMULAI (${modeParams.quizModeLabel} • ${modeParams.difficultyLabel} • ${started.timerDurationSec}s)!`, "⏱️");
         } catch (error) {
             console.error("Start game failed:", error);
             showToast?.(error.message || "Gagal memulai sesi permainan", "⚠️");
@@ -404,7 +425,10 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                 // Game Won!
                 setSubmittingAction(true);
                 const answerReveal = formatRevealedAnswer(selectedGameId, currentQuestion, secretData);
-                await recordGameOutcome(eventId, rawIdentifier, 'win', currentUser?.uid || 'host_staff');
+                await recordGameOutcome(eventId, rawIdentifier, 'win', currentUser?.uid || 'host_staff', {
+                    sessionId,
+                    allowReplayUpdate: (eventConfig?.maxPlaysPerParticipant || 1) > 1
+                });
                 await updateSessionState(eventId, stationId, {
                     sessionId,
                     revision: nextRev,
@@ -445,7 +469,10 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
             setSessionRevision(nextRev);
 
             const answerReveal = formatRevealedAnswer(selectedGameId, currentQuestion, secretData);
-            await recordGameOutcome(eventId, rawIdentifier, 'lose', currentUser?.uid || 'host_staff');
+            await recordGameOutcome(eventId, rawIdentifier, 'lose', currentUser?.uid || 'host_staff', {
+                sessionId,
+                allowReplayUpdate: (eventConfig?.maxPlaysPerParticipant || 1) > 1
+            });
             await updateSessionState(eventId, stationId, {
                 sessionId,
                 revision: nextRev,
@@ -466,7 +493,7 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
     };
 
     // Handler: Timeout (Auto Loss)
-    const handleSessionTimeout = async () => {
+    const handleSessionTimeout = useCallback(async () => {
         if (session.status !== SESSION_STATES.PLAYING) return;
 
         try {
@@ -476,13 +503,16 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
             setSessionRevision(nextRev);
 
             const answerReveal = formatRevealedAnswer(selectedGameId, currentQuestion, secretData);
-            await recordGameOutcome(eventId, rawIdentifier, 'lose', currentUser?.uid || 'host_staff');
+            await recordGameOutcome(eventId, rawIdentifier, 'lose', currentUser?.uid || 'host_staff', {
+                sessionId,
+                allowReplayUpdate: (eventConfig?.maxPlaysPerParticipant || 1) > 1
+            });
             await updateSessionState(eventId, stationId, {
                 sessionId,
                 revision: nextRev,
                 status: SESSION_STATES.LOST,
                 result: 'lose',
-                disqualificationReason: "Waktu habis (30 detik)",
+                disqualificationReason: `Waktu habis (${session.timerDurationSec || 30} detik)`,
                 revealedMediaUrl: currentQuestion.revealedMediaUrl || null,
                 revealedAnswer: answerReveal,
                 completedAt: new Date().toISOString()
@@ -492,7 +522,11 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
         } catch (e) {
             console.error("Timeout handling error:", e);
         }
-    };
+    }, [session, sessionRevision, selectedGameId, currentQuestion, secretData, eventId, rawIdentifier, currentUser?.uid, sessionId, eventConfig?.maxPlaysPerParticipant, stationId, showToast]);
+
+    useEffect(() => {
+        timeoutFnRef.current = handleSessionTimeout;
+    }, [handleSessionTimeout]);
 
     // Handler: Claim Live Sketch Commission
     const handleClaimSketch = async () => {
@@ -678,6 +712,14 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                         <span>Buka Display</span>
                     </Link>
                     <Link
+                        to="/arcade/reaction"
+                        className="btn bg-yellow hover:bg-white border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818] cursor-pointer transition-transform hover:scale-105"
+                        title="Buka Arena Duel Reaksi PvP (Best of 3)"
+                    >
+                        <i className="fa-solid fa-bolt text-pink"></i>
+                        <span>Reaction Battle</span>
+                    </Link>
+                    <Link
                         to="/arcade/questions"
                         className="btn bg-white hover:bg-pink-light border-2 border-text rounded-lg px-2.5 py-1 text-xs font-title font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#181818] cursor-pointer transition-transform hover:scale-105"
                         title="Kelola Bank Soal & Aset Media"
@@ -795,6 +837,62 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                     </button>
                                 );
                             })}
+                        </div>
+
+                        {/* Difficulty & Quiz Mode Configurator (Quizmaster v2) */}
+                        <div className="bg-blue-light/25 border-2 border-text rounded-xl p-3 mb-3 space-y-2.5">
+                            <div>
+                                <span className="text-[10px] font-tag font-black uppercase text-text/70 block mb-1">Tingkat Kesulitan</span>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {Object.values(QUIZ_DIFFICULTIES).map(d => (
+                                        <button
+                                            key={d.id}
+                                            type="button"
+                                            disabled={isSessionActive}
+                                            onClick={() => {
+                                                setSelectedDifficulty(d.id);
+                                                syncReadyStateToDisplay(currentQuestion, selectedGameId, d.id, selectedQuizMode);
+                                            }}
+                                            className={`py-1 rounded-lg border-2 text-[11px] font-title font-bold cursor-pointer transition-all ${
+                                                selectedDifficulty === d.id
+                                                    ? 'bg-yellow border-text text-text shadow-[1.5px_1.5px_0px_#181818]'
+                                                    : 'bg-white border-text/30 text-text/75 hover:border-text'
+                                            } disabled:opacity-50`}
+                                            title={d.description}
+                                        >
+                                            {d.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-tag font-black uppercase text-text/70 block mb-1">Mode Kuis</span>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {Object.values(QUIZ_MODES).map(m => (
+                                        <button
+                                            key={m.id}
+                                            type="button"
+                                            disabled={isSessionActive}
+                                            onClick={() => {
+                                                setSelectedQuizMode(m.id);
+                                                syncReadyStateToDisplay(currentQuestion, selectedGameId, selectedDifficulty, m.id);
+                                            }}
+                                            className={`py-1 rounded-lg border-2 text-[11px] font-title font-bold cursor-pointer transition-all ${
+                                                selectedQuizMode === m.id
+                                                    ? 'bg-pink border-text text-text shadow-[1.5px_1.5px_0px_#181818]'
+                                                    : 'bg-white border-text/30 text-text/75 hover:border-text'
+                                            } disabled:opacity-50`}
+                                            title={m.description}
+                                        >
+                                            {m.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center text-[10.5px] font-bold pt-1 border-t border-text/15">
+                                <span>Timer Mode Ini: <strong className="text-pink">{modeParams.timerDurationSec} detik</strong></span>
+                                <span>Target: <strong className="text-text">{modeParams.targetCount}x</strong></span>
+                            </div>
                         </div>
 
                         {/* Selected Challenge Details */}
@@ -1217,15 +1315,15 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                             <div className="pt-2">
                                 <button
                                     type="button"
-                                    disabled={submittingAction || participantStatus?.hasPlayed}
+                                    disabled={submittingAction || (participantStatus?.hasPlayed && (participantStatus?.record?.playCount || 1) >= (eventConfig?.maxPlaysPerParticipant || 1))}
                                     onClick={handleStartGame}
                                     className="btn bg-pink text-text border-[3px] border-text rounded-2xl w-full py-4 font-title text-lg font-extrabold shadow-btn hover:bg-white hover:translate-y-[-2px] active:translate-y-[2px] transition-all cursor-pointer flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <i className="fa-solid fa-play text-xl"></i>
-                                    <span>MULAI TANTANGAN (30 DETIK)</span>
+                                    <span>MULAI TANTANGAN ({modeParams.timerDurationSec} DETIK)</span>
                                 </button>
                                 <p className="text-[11px] text-center opacity-70 mt-2 font-medium">
-                                    Klik tombol di atas saat peserta sudah siap. Timer 30 detik akan langsung berjalan serentak.
+                                    Mode {modeParams.quizModeLabel} ({modeParams.difficultyLabel}) — timer {modeParams.timerDurationSec} detik akan berjalan serentak.
                                 </p>
                             </div>
                         )}
@@ -1375,6 +1473,63 @@ export default function HostConsole({ currentUser, userRole, showToast }) {
                                 className="pl-8 pr-3 py-1.5 text-xs bg-yellow-light/20 border-2 border-text rounded-xl focus:bg-white outline-none w-48 sm:w-60 font-body text-text"
                             />
                         </div>
+                    </div>
+                </div>
+
+                {/* Summary Stats Badges & Daily Quota Bar */}
+                <div className="bg-blue-light/20 border-2 border-text rounded-xl p-3 mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-title font-bold">
+                            🎨 Kuota Sketch Harian: <strong className={quotaStatus.sketchQuotaExhausted ? 'text-rose-700' : 'text-emerald-700'}>{quotaStatus.sketchUsedToday}/{quotaStatus.sketchQuota}</strong>
+                        </span>
+                        <span className="font-title font-bold">
+                            🌸 Kuota Sticker Harian: <strong>{quotaStatus.stickerUsedToday}/{quotaStatus.stickerQuota}</strong>
+                        </span>
+                        <span className="text-[11px] font-bold text-text/75">
+                            Quiz: {quotaStatus.totalQuizPlays} • Reaction Battle: {quotaStatus.totalReactionPlays}
+                        </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <label className="text-[10.5px] font-bold flex items-center gap-1">
+                            Batas Main/Org:
+                            <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={eventConfig.maxPlaysPerParticipant}
+                                onChange={(e) => setEventConfig(prev => ({ ...prev, maxPlaysPerParticipant: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                                className="w-12 border border-text rounded px-1.5 py-0.5 text-center bg-white font-bold"
+                            />
+                        </label>
+                        <label className="text-[10.5px] font-bold flex items-center gap-1">
+                            Kuota Sketch/Hr:
+                            <input
+                                type="number"
+                                min="0"
+                                max="500"
+                                value={eventConfig.dailySketchQuota}
+                                onChange={(e) => setEventConfig(prev => ({ ...prev, dailySketchQuota: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                                className="w-14 border border-text rounded px-1.5 py-0.5 text-center bg-white font-bold"
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            disabled={savingEventConfig}
+                            onClick={async () => {
+                                setSavingEventConfig(true);
+                                try {
+                                    await saveEventArcadeConfig(eventId, eventConfig);
+                                    showToast?.('Pengaturan kuota event tersimpan!', '💾');
+                                } catch {
+                                    showToast?.('Gagal menyimpan pengaturan kuota', '⚠️');
+                                } finally {
+                                    setSavingEventConfig(false);
+                                }
+                            }}
+                            className="btn bg-yellow hover:bg-white border border-text rounded-lg px-2.5 py-1 text-[11px] font-title font-bold cursor-pointer"
+                        >
+                            {savingEventConfig ? '...' : 'Simpan Kuota'}
+                        </button>
                     </div>
                 </div>
 

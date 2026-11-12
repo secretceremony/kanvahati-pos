@@ -142,5 +142,47 @@ service cloud.firestore {
       allow update: if isArcadeHost(); // Confirming prize claim
       allow delete: if isAdmin(); // Only Admin can delete participant logs
     }
+
+    // =========================================================================
+    // 7. KANVAHATI ARCADE: EVENT CONFIG (Play Limits & Daily Prize Quotas)
+    // =========================================================================
+    match /arcade_event_config/{eventId} {
+      allow read: if isDisplay();
+      allow write: if isArcadeHost();
+    }
+
+    // =========================================================================
+    // 8. KANVAHATI ARCADE: REACTION BATTLE ROOMS & SERVER-TIMESTAMPED TAPS
+    // =========================================================================
+    match /reaction_rooms/{roomCode} {
+      // Visitors on booth tablet/phone (or Display) can join/read room state
+      allow read: if true;
+      // Only Host/Admin can create, reset, or adjudicate match results
+      allow create, delete: if isArcadeHost();
+      // Visitors can only update their own visitor join/ready fields, never host/score/matchWinner
+      allow update: if isArcadeHost() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visitor', 'status', 'revision', 'updatedAt', 'updatedAtMs']) &&
+        request.resource.data.host == resource.data.host &&
+        request.resource.data.matchWinner == resource.data.matchWinner &&
+        request.resource.data.round == resource.data.round &&
+        request.resource.data.roundHistory == resource.data.roundHistory &&
+        request.resource.data.visitor.score == resource.data.visitor.score
+      );
+
+      match /taps/host {
+        allow read: if true;
+        allow write: if isArcadeHost();
+      }
+
+      match /taps/visitor {
+        allow read: if true;
+        // Visitor tap document can be written by visitor device or host reset,
+        // and cannot fabricate host role or spoof serverAt timestamp.
+        allow write: if isArcadeHost() || (
+          request.resource.data.role == 'visitor' &&
+          request.resource.data.serverAt == request.time
+        );
+      }
+    }
   }
 }

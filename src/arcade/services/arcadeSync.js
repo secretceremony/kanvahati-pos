@@ -42,7 +42,7 @@ export async function getEstimatedServerClockOffset() {
             lastOffsetCheckTime = now;
             return cachedClockOffsetMs;
         }
-    } catch (e) {
+    } catch {
         // If offline or fetch fails, fallback gracefully to 0
     }
 
@@ -132,6 +132,8 @@ export function sanitizeDisplaySession(rawSession) {
         status: normalizedStatus,
         gameId: rawSession.gameId || null,
         gameTitle: rawSession.gameTitle || null,
+        difficulty: rawSession.difficulty || 'normal',
+        quizMode: rawSession.quizMode || 'classic',
         displayPrompt: rawSession.displayPrompt || null,
         mediaUrl: rawSession.mediaUrl || null,
         revealedMediaUrl: isFinished 

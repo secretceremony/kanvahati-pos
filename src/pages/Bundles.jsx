@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { getBundles, saveBundle, deleteBundle, getProducts, sp_import_bundles_batch } from '../services/db';
+import { useState, useEffect, useMemo } from 'react';
+import { getBundles, saveBundle, deleteBundle, getProducts, sp_import_bundles_batch, purgeAllDiscountsAndBundles } from '../services/db';
 import * as XLSX from 'xlsx';
 import { recordAuditLog } from '../services/audit';
+import { formatRupiah, sanitizeIntegerInput, toIntRupiah } from '../utils/currency';
 import { t } from '../services/translations';
 import BundleCard from '../components/bundles/BundleCard';
 
@@ -27,6 +28,35 @@ export default function Bundles({ showToast, currentUser, userRole }) {
     const [importPreview, setImportPreview] = useState([]);
     const [importErrors, setImportErrors] = useState([]);
 
+    // Safe Purge All Discounts & Bundles Modal state
+    const [showPurgeModal, setShowPurgeModal] = useState(false);
+    const [purgeOptions, setPurgeOptions] = useState({
+        clearItemDiscounts: true,
+        deleteAllBundles: true,
+        acknowledgeIrreversible: false,
+        acknowledgeImpact: false,
+        confirmText: ''
+    });
+    const [isPurging, setIsPurging] = useState(false);
+
+    const discountStats = useMemo(() => {
+        let discountedProducts = 0;
+        let discountedVariations = 0;
+        products.forEach(p => {
+            if (toIntRupiah(p.discount || 0) > 0) discountedProducts += 1;
+            if (Array.isArray(p.variations)) {
+                p.variations.forEach(v => {
+                    if (toIntRupiah(v.discount || 0) > 0) discountedVariations += 1;
+                });
+            }
+        });
+        return {
+            discountedProducts,
+            discountedVariations,
+            bundleCount: bundles.length
+        };
+    }, [products, bundles]);
+
     const loadData = async () => {
         setLoading(true);
         const [loadedBundles, loadedProducts] = await Promise.all([
@@ -39,7 +69,18 @@ export default function Bundles({ showToast, currentUser, userRole }) {
     };
 
     useEffect(() => {
-        loadData();
+        let mounted = true;
+        (async () => {
+            const [loadedBundles, loadedProducts] = await Promise.all([
+                getBundles(),
+                getProducts()
+            ]);
+            if (!mounted) return;
+            setBundles(loadedBundles);
+            setProducts(loadedProducts);
+            setLoading(false);
+        })();
+        return () => { mounted = false; };
     }, []);
 
     const handleOpenModal = (bundle = null) => {
@@ -116,17 +157,18 @@ export default function Bundles({ showToast, currentUser, userRole }) {
         e.preventDefault();
         
         // Validation
+        const cleanBundlePrice = toIntRupiah(formData.bundlePrice);
         if (!formData.name.trim()) return alert("Nama bundle harus diisi");
-        if (!formData.bundlePrice || parseFloat(formData.bundlePrice) <= 0) return alert("Harga bundle tidak valid");
+        if (!formData.bundlePrice || cleanBundlePrice <= 0) return alert("Harga bundle tidak valid");
         
-        const validItems = formData.items.filter(i => i.productId && parseInt(i.qty) > 0);
-        const totalQty = validItems.reduce((sum, i) => sum + parseInt(i.qty), 0);
+        const validItems = formData.items.filter(i => i.productId && parseInt(i.qty, 10) > 0);
+        const totalQty = validItems.reduce((sum, i) => sum + parseInt(i.qty, 10), 0);
         if (totalQty < 2) return alert("Bundle minimal harus memiliki kuantitas total 2 produk");
 
         const bundleToSave = {
             id: editingBundle ? editingBundle.id : undefined,
             name: formData.name,
-            bundlePrice: parseFloat(formData.bundlePrice),
+            bundlePrice: cleanBundlePrice,
             isActive: formData.isActive,
             items: validItems,
             createdAt: editingBundle ? editingBundle.createdAt : new Date().toISOString()
@@ -256,7 +298,7 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                     }
 
                     const rawId = rowObj["ID"] || rowObj["id"] || rowObj["ID (Opsional, kosongkan utk auto)"] || cleanValues[0] || '';
-                    const bundlePrice = parseFloat(rowObj["Harga Bundle (Rp)"] || rowObj["bundlePrice"] || cleanValues[2] || 0);
+                    const bundlePrice = toIntRupiah(rowObj["Harga Bundle (Rp)"] || rowObj["bundlePrice"] || cleanValues[2] || 0);
                     const activeRaw = String(rowObj["Status Aktif (TRUE/FALSE)"] || rowObj["isActive"] || cleanValues[3] || 'TRUE').toUpperCase();
                     const isActive = activeRaw === 'TRUE' || activeRaw === '1' || activeRaw === 'YA';
                     const itemsRaw = rowObj["Item Bundle Format (ProductID:Qty:Variasi|...)"] || rowObj["items"] || cleanValues[4] || '';
@@ -325,13 +367,71 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                 setImportErrors([]);
                 loadData();
             }
-        } catch (e) {
+        } catch {
             if (showToast) showToast("Gagal melakukan batch import bundle", "⚠️");
         }
     };
 
-    const formatMoney = (value) => {
-        return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
+    const formatMoney = (value) => formatRupiah(value);
+
+    const openPurgeModal = () => {
+        setPurgeOptions({
+            clearItemDiscounts: true,
+            deleteAllBundles: true,
+            acknowledgeIrreversible: false,
+            acknowledgeImpact: false,
+            confirmText: ''
+        });
+        setShowPurgeModal(true);
+    };
+
+    const canExecutePurge =
+        (purgeOptions.clearItemDiscounts || purgeOptions.deleteAllBundles) &&
+        purgeOptions.acknowledgeIrreversible &&
+        purgeOptions.acknowledgeImpact &&
+        purgeOptions.confirmText.trim().toUpperCase() === 'HAPUS DISKON' &&
+        !isPurging;
+
+    const handleExecutePurge = async (e) => {
+        e.preventDefault();
+        if (!canExecutePurge) return;
+        setIsPurging(true);
+        try {
+            const res = await purgeAllDiscountsAndBundles({
+                clearItemDiscounts: purgeOptions.clearItemDiscounts,
+                deleteAllBundles: purgeOptions.deleteAllBundles
+            });
+
+            await recordAuditLog({
+                action: 'DISCOUNT_CHANGE',
+                summary: `Purge massal diskon: ${res.updatedProductsCount} produk (${res.updatedVariationsCount} variasi) direset ke 0, ${res.deletedBundlesCount} bundle dihapus`,
+                actor: {
+                    uid: currentUser?.uid,
+                    email: currentUser?.email,
+                    displayName: currentUser?.displayName || 'Staf',
+                    role: userRole
+                },
+                details: {
+                    clearItemDiscounts: purgeOptions.clearItemDiscounts,
+                    deleteAllBundles: purgeOptions.deleteAllBundles,
+                    ...res
+                }
+            });
+
+            if (showToast) {
+                showToast(
+                    `Purge selesai: ${res.updatedProductsCount} item direset & ${res.deletedBundlesCount} bundle dihapus!`,
+                    '🧹'
+                );
+            }
+            setShowPurgeModal(false);
+            await loadData();
+        } catch (err) {
+            console.error('Purge discount error:', err);
+            if (showToast) showToast('Gagal melakukan purge diskon!', '⚠️');
+        } finally {
+            setIsPurging(false);
+        }
     };
 
     return (
@@ -355,7 +455,7 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                 </div>
                 
                 {/* Bundle Action Toolbar: Responsive Layout with Primary Button Prominence */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-wrap">
                     <button 
                         onClick={() => handleOpenModal()}
                         className="btn bg-pink text-text border-[2.5px] border-text rounded-full font-title text-[13px] px-5 py-2.5 shadow-[3px_3px_0px_#181818] hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#181818] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer flex items-center justify-center gap-2 font-bold order-1 sm:order-2"
@@ -363,7 +463,7 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                         <i className="fa-solid fa-plus"></i> {t.addBundle}
                     </button>
 
-                    <div className="grid grid-cols-2 gap-2 order-2 sm:order-1">
+                    <div className="flex flex-wrap items-center gap-2 order-2 sm:order-1">
                         <label 
                             className="btn bg-white text-text border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-yellow-light hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                             title="Import bundle via file CSV"
@@ -384,6 +484,16 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                             title="Unduh format spreadsheet bundle .xlsx"
                         >
                             <i className="fa-solid fa-file-excel"></i> Template
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={openPurgeModal}
+                            disabled={discountStats.discountedProducts === 0 && discountStats.discountedVariations === 0 && discountStats.bundleCount === 0}
+                            className="btn bg-rose-100 text-rose-800 border-2 border-text rounded-full px-3.5 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-rose-500 hover:text-white active:translate-y-[1px] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+                            title="Hapus semua diskon item dan/atau paket bundle sekaligus"
+                        >
+                            <i className="fa-solid fa-broom"></i> Purge Diskon
                         </button>
                     </div>
                 </div>
@@ -539,11 +649,11 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                                         <label className="text-xs font-bold uppercase">{t.bundlePrice}</label>
                                         <div className="flex gap-4 items-center">
                                             <input 
-                                                type="number" 
+                                                type="text"
+                                                inputMode="numeric"
                                                 required
-                                                min="0"
                                                 value={formData.bundlePrice}
-                                                onChange={e => setFormData({...formData, bundlePrice: e.target.value})}
+                                                onChange={e => setFormData({...formData, bundlePrice: sanitizeIntegerInput(e.target.value)})}
                                                 className="w-full border-2 border-text rounded-xl p-2 text-lg font-bold outline-none focus:bg-yellow-light/30"
                                                 placeholder="Contoh: 55000"
                                             />
@@ -559,12 +669,12 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                                         </div>
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-sm">Harga Bundle:</span>
-                                            <span className="font-bold text-pink">{formatMoney(parseFloat(formData.bundlePrice) || 0)}</span>
+                                            <span className="font-bold text-pink">{formatMoney(toIntRupiah(formData.bundlePrice))}</span>
                                         </div>
                                         <div className="flex justify-between items-center border-t border-text/20 pt-2 text-sm font-bold">
                                             <span>Pelanggan Hemat:</span>
                                             <span className="bg-yellow border-2 border-text px-2 py-0.5 rounded-full text-[11px] transform -rotate-2">
-                                                {formatMoney(Math.max(0, calculateOriginalPrice(formData.items) - (parseFloat(formData.bundlePrice) || 0)))}
+                                                {formatMoney(Math.max(0, calculateOriginalPrice(formData.items) - toIntRupiah(formData.bundlePrice)))}
                                             </span>
                                         </div>
                                     </div>
@@ -694,6 +804,138 @@ export default function Bundles({ showToast, currentUser, userRole }) {
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Safe Multi-Check Purge All Discounts & Bundles Modal */}
+            {showPurgeModal && (
+                <div className="fixed inset-0 bg-[#181818]/65 backdrop-blur-sm z-[10002] flex items-center justify-center p-4">
+                    <form
+                        onSubmit={handleExecutePurge}
+                        className="bg-white border-[3px] border-text rounded-2xl w-full max-w-[500px] shadow-[8px_8px_0px_#181818] overflow-hidden flex flex-col font-body text-text"
+                    >
+                        <div className="bg-rose-500 text-white px-5 py-3.5 border-b-[3px] border-text flex justify-between items-center">
+                            <h3 className="font-title text-lg font-bold flex items-center gap-2">
+                                <i className="fa-solid fa-triangle-exclamation"></i>
+                                <span>Purge Semua Diskon & Promo</span>
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowPurgeModal(false)}
+                                className="text-white hover:scale-110 cursor-pointer"
+                            >
+                                <i className="fa-solid fa-xmark text-xl"></i>
+                            </button>
+                        </div>
+
+                        <div className="p-5 flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+                            {/* Live Impact Summary */}
+                            <div className="bg-rose-50 border-2 border-rose-400 rounded-xl p-3.5 text-xs">
+                                <span className="font-tag font-black uppercase text-[10px] text-rose-800 block mb-1.5">Data Aktif yang Akan Terdampak:</span>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-white border border-rose-300 rounded-lg p-2">
+                                        <span className="font-title font-black text-base text-rose-700 block">{discountStats.discountedProducts}</span>
+                                        <span className="text-[10px] font-bold text-text/75">Produk Diskon</span>
+                                    </div>
+                                    <div className="bg-white border border-rose-300 rounded-lg p-2">
+                                        <span className="font-title font-black text-base text-rose-700 block">{discountStats.discountedVariations}</span>
+                                        <span className="text-[10px] font-bold text-text/75">Variasi Diskon</span>
+                                    </div>
+                                    <div className="bg-white border border-rose-300 rounded-lg p-2">
+                                        <span className="font-title font-black text-base text-rose-700 block">{discountStats.bundleCount}</span>
+                                        <span className="text-[10px] font-bold text-text/75">Paket Bundle</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Target Scope Checkboxes */}
+                            <div className="flex flex-col gap-2">
+                                <span className="font-tag font-black uppercase text-[10.5px] text-text/70">1. Pilih Target yang Dihapus:</span>
+                                <label className="flex items-start gap-2.5 p-2.5 rounded-xl border-2 border-text/20 bg-yellow-light/20 cursor-pointer hover:border-text">
+                                    <input
+                                        type="checkbox"
+                                        checked={purgeOptions.clearItemDiscounts}
+                                        onChange={(e) => setPurgeOptions(prev => ({ ...prev, clearItemDiscounts: e.target.checked }))}
+                                        className="w-4 h-4 mt-0.5 accent-pink cursor-pointer"
+                                    />
+                                    <div className="text-xs">
+                                        <span className="font-bold block">Reset semua diskon per-item & variasi menjadi Rp 0</span>
+                                        <span className="text-[11px] text-text/70">Mengembalikan harga jual seluruh barang ke harga normal.</span>
+                                    </div>
+                                </label>
+                                <label className="flex items-start gap-2.5 p-2.5 rounded-xl border-2 border-text/20 bg-pink-light/20 cursor-pointer hover:border-text">
+                                    <input
+                                        type="checkbox"
+                                        checked={purgeOptions.deleteAllBundles}
+                                        onChange={(e) => setPurgeOptions(prev => ({ ...prev, deleteAllBundles: e.target.checked }))}
+                                        className="w-4 h-4 mt-0.5 accent-pink cursor-pointer"
+                                    />
+                                    <div className="text-xs">
+                                        <span className="font-bold block">Hapus semua Paket Bundle Promo ({discountStats.bundleCount} bundle)</span>
+                                        <span className="text-[11px] text-text/70">Menghapus permanen seluruh daftar paket bundle di database.</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Mandatory Safety Checks */}
+                            <div className="flex flex-col gap-2 border-t-2 border-dashed border-text/15 pt-3">
+                                <span className="font-tag font-black uppercase text-[10.5px] text-rose-700">2. Verifikasi Keamanan (Wajib Dicentang Semua):</span>
+                                <label className="flex items-start gap-2 text-xs cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={purgeOptions.acknowledgeImpact}
+                                        onChange={(e) => setPurgeOptions(prev => ({ ...prev, acknowledgeImpact: e.target.checked }))}
+                                        className="w-4 h-4 mt-0.5 accent-rose-600 cursor-pointer"
+                                    />
+                                    <span className="font-bold">Saya sudah memeriksa jumlah produk dan bundle yang akan dibersihkan.</span>
+                                </label>
+                                <label className="flex items-start gap-2 text-xs cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={purgeOptions.acknowledgeIrreversible}
+                                        onChange={(e) => setPurgeOptions(prev => ({ ...prev, acknowledgeIrreversible: e.target.checked }))}
+                                        className="w-4 h-4 mt-0.5 accent-rose-600 cursor-pointer"
+                                    />
+                                    <span className="font-bold">Saya paham aksi ini permanen (riwayat transaksi lama tidak ikut berubah).</span>
+                                </label>
+
+                                <div className="mt-1">
+                                    <label className="block text-[11px] font-bold mb-1">
+                                        Ketik <code className="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded border border-rose-300 font-mono">HAPUS DISKON</code> untuk konfirmasi:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={purgeOptions.confirmText}
+                                        onChange={(e) => setPurgeOptions(prev => ({ ...prev, confirmText: e.target.value }))}
+                                        placeholder="Ketik HAPUS DISKON"
+                                        className="w-full border-2 border-text rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase outline-none focus:bg-rose-50"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t-[3px] border-text bg-gray-50 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowPurgeModal(false)}
+                                className="px-4 py-2 text-xs font-title font-bold rounded-full border-2 border-text bg-white hover:bg-yellow-light cursor-pointer"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!canExecutePurge}
+                                className={`px-5 py-2 text-xs font-title font-bold rounded-full border-[3px] border-text flex items-center gap-1.5 transition-all ${
+                                    canExecutePurge
+                                        ? 'bg-rose-600 text-white shadow-[3px_3px_0px_#181818] hover:bg-rose-700 cursor-pointer'
+                                        : 'bg-gray-200 text-gray-500 border-gray-400 cursor-not-allowed opacity-70'
+                                }`}
+                            >
+                                <i className="fa-solid fa-broom"></i>
+                                <span>{isPurging ? 'Menghapus...' : 'Ya, Purge Sekarang'}</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
         </div>

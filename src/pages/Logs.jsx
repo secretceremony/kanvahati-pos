@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getTransactionsList, deleteTransactionAndRefund } from '../services/db';
 import { recordAuditLog } from '../services/audit';
+import { formatRupiah, toIntRupiah } from '../utils/currency';
 import { t } from '../services/translations';
 
 export default function Logs({ onReprint, showToast, currentUser, userRole }) {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedTxIds, setExpandedTxIds] = useState(() => new Set());
 
     // Grouping, Filtering, Sorting & Pagination State
     const [groupBy, setGroupBy] = useState('daily'); // 'none', 'daily', 'weekly', 'monthly'
@@ -30,7 +32,18 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
     };
 
     useEffect(() => {
-        fetchTransactions();
+        let mounted = true;
+        (async () => {
+            try {
+                const logs = await getTransactionsList();
+                if (mounted) setTransactions(logs);
+            } catch (e) {
+                console.error("Failed to load transactions", e);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        })();
+        return () => { mounted = false; };
     }, []);
 
     const handleDeleteTransaction = async (tx) => {
@@ -87,14 +100,32 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                 } else {
                     showToast("Gagal membatalkan transaksi.", "⚠️");
                 }
-            } catch (err) {
+            } catch {
                 showToast("Terjadi kesalahan saat membatalkan transaksi.", "⚠️");
             }
         }
     };
 
-    const formatLogMoney = (value) => {
-        return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
+    const formatLogMoney = (value) => formatRupiah(value);
+
+    const toggleExpandTx = (txId) => {
+        setExpandedTxIds(prev => {
+            const next = new Set(prev);
+            if (next.has(txId)) next.delete(txId);
+            else next.add(txId);
+            return next;
+        });
+    };
+
+    const getTxDiscountSummary = (tx) => {
+        const items = Array.isArray(tx.items) ? tx.items : [];
+        const itemDiscountTotal = toIntRupiah(
+            tx.totalItemDiscount ?? items.reduce((s, it) => s + toIntRupiah(it.discount || 0) * (parseInt(it.qty, 10) || 1), 0)
+        );
+        const bundleDiscountTotal = (tx.appliedBundles || []).reduce((s, b) => s + toIntRupiah(b.discount || 0), 0);
+        const txDiscount = toIntRupiah(tx.transactionDiscount || 0);
+        const hasAnyDiscount = itemDiscountTotal > 0 || bundleDiscountTotal > 0 || txDiscount > 0;
+        return { itemDiscountTotal, bundleDiscountTotal, txDiscount, hasAnyDiscount };
     };
 
     // Extract unique cashiers
@@ -312,11 +343,22 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                 <span className="text-[11px] text-pink font-bold">{formatLogMoney(section.groupTotal)} ({section.groupQty} pcs)</span>
                                             </div>
                                         )}
-                                        {section.items.map(tx => (
+                                        {section.items.map(tx => {
+                                            const discSummary = getTxDiscountSummary(tx);
+                                            const isExpanded = expandedTxIds.has(tx.id);
+                                            const items = Array.isArray(tx.items) ? tx.items : [];
+                                            return (
                                             <div key={tx.id} className="bg-yellow-light/20 border-2 border-text rounded-xl p-3.5 shadow-[2px_2px_0px_#181818] flex flex-col gap-2.5">
                                                 {/* Card Top: Order ID & Time */}
                                                 <div className="flex justify-between items-center border-b border-dashed border-text/20 pb-2">
-                                                    <span className="font-bold text-xs bg-blue-light border border-text rounded-md px-2 py-0.5 font-mono">{tx.id}</span>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="font-bold text-xs bg-blue-light border border-text rounded-md px-2 py-0.5 font-mono">{tx.id}</span>
+                                                        {discSummary.hasAnyDiscount && (
+                                                            <span className="text-[10px] font-tag font-black uppercase bg-pink text-white border border-text rounded-full px-2 py-0.5">
+                                                                Diskon
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <span className="text-[11px] opacity-70 font-mono">{new Date(tx.timestamp).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
                                                 </div>
 
@@ -328,19 +370,77 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                     </div>
                                                     <div>
                                                         <span className="text-[10px] opacity-60 uppercase block font-bold">Barang</span>
-                                                        <span className="font-bold">{tx.qty} pcs</span>
+                                                        <span className="font-bold">{tx.qty} pcs ({items.length} baris)</span>
                                                     </div>
                                                     <div>
                                                         <span className="text-[10px] opacity-60 uppercase block font-bold">Metode</span>
                                                         <span className="font-bold capitalize text-pink font-title">
                                                             {tx.paymentMethod === 'cash' ? t.cash : t.qris}
                                                         </span>
+                                                        {tx.qrisRef && (
+                                                            <span className="block text-[9.5px] font-mono text-text/60">{tx.qrisRef}</span>
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <span className="text-[10px] opacity-60 uppercase block font-bold">Total Belanja</span>
                                                         <span className="font-bold text-sm text-text font-title">{formatLogMoney(tx.total)}</span>
                                                     </div>
                                                 </div>
+
+                                                {/* Expandable Item & Discount Breakdown */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleExpandTx(tx.id)}
+                                                    className="w-full text-left bg-white border border-text/30 rounded-lg px-2.5 py-1.5 text-[11px] font-title font-bold flex items-center justify-between cursor-pointer hover:bg-yellow-light/40"
+                                                >
+                                                    <span>{isExpanded ? '▼ Sembunyikan Detail Barang' : `▶ Detail ${items.length} Item & Diskon`}</span>
+                                                    <span className={discSummary.hasAnyDiscount ? 'text-pink' : 'text-text/55'}>
+                                                        {discSummary.hasAnyDiscount ? 'Ada Diskon' : 'Tanpa Diskon'}
+                                                    </span>
+                                                </button>
+
+                                                {isExpanded && (
+                                                    <div className="bg-white border border-text/25 rounded-lg p-2.5 flex flex-col gap-1.5 text-[11px]">
+                                                        {items.map((item, idx) => {
+                                                            const itemDisc = toIntRupiah(item.discount || 0);
+                                                            const origPrice = toIntRupiah(item.originalPrice || (toIntRupiah(item.price) + itemDisc));
+                                                            const netPrice = toIntRupiah(item.price);
+                                                            return (
+                                                                <div key={idx} className="flex justify-between items-start gap-2 border-b border-dashed border-text/10 pb-1 last:border-none last:pb-0">
+                                                                    <div className="min-w-0">
+                                                                        <span className="font-bold block">{item.qty}x {item.name}</span>
+                                                                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                                                            {itemDisc > 0 ? (
+                                                                                <span className="text-[9.5px] bg-pink-light text-pink border border-pink/40 rounded px-1.5 py-0.2 font-bold">
+                                                                                    Diskon Item -{formatLogMoney(itemDisc)}/pcs ({formatLogMoney(origPrice)} → {formatLogMoney(netPrice)})
+                                                                                </span>
+                                                                            ) : item.fromBundle ? (
+                                                                                <span className="text-[9.5px] bg-yellow-light text-text border border-text/25 rounded px-1.5 py-0.2 font-bold">
+                                                                                    Bagian Bundle
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-[9.5px] text-text/55">Tanpa diskon</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="font-title font-bold shrink-0">{formatLogMoney(netPrice * (item.qty || 1))}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {(tx.appliedBundles || []).map((b, bIdx) => (
+                                                            <div key={bIdx} className="flex justify-between text-pink font-bold pt-1 border-t border-dashed border-text/15">
+                                                                <span>Promo Bundle: {b.bundleName}</span>
+                                                                <span>-{formatLogMoney(b.discount || 0)}</span>
+                                                            </div>
+                                                        ))}
+                                                        {discSummary.txDiscount > 0 && (
+                                                            <div className="flex justify-between text-pink font-bold pt-1 border-t border-dashed border-text/15">
+                                                                <span>Diskon Transaksi:</span>
+                                                                <span>-{formatLogMoney(discSummary.txDiscount)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
 
                                                 {/* Card Actions: Quick Buttons */}
                                                 <div className="flex gap-2 pt-2 border-t border-dashed border-text/20">
@@ -367,7 +467,8 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                     )}
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 ))}
                             </div>
@@ -399,8 +500,13 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                         </td>
                                                     </tr>
                                                 )}
-                                                {section.items.map(tx => (
-                                                    <tr key={tx.id} className="hover:bg-yellow-light border-b border-text/15">
+                                                {section.items.map(tx => {
+                                                    const discSummary = getTxDiscountSummary(tx);
+                                                    const isExpanded = expandedTxIds.has(tx.id);
+                                                    const items = Array.isArray(tx.items) ? tx.items : [];
+                                                    return (
+                                                    <React.Fragment key={tx.id}>
+                                                    <tr className="hover:bg-yellow-light border-b border-text/15">
                                                         <td className="p-3 font-mono font-bold text-xs">{tx.id}</td>
                                                         <td className="p-3">{new Date(tx.timestamp).toLocaleString('id-ID')}</td>
                                                         <td className="p-3">
@@ -409,9 +515,48 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                                 {(tx.cashier || 'Staf').replace(/^Kasir\s+/i, '')}
                                                             </span>
                                                         </td>
-                                                        <td className="p-3 font-bold">{tx.qty} barang</td>
+                                                        <td className="p-3">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleExpandTx(tx.id)}
+                                                                className="text-left cursor-pointer group"
+                                                                title="Klik untuk melihat detail barang & status diskon"
+                                                            >
+                                                                <span className="font-bold flex items-center gap-1.5 group-hover:text-pink">
+                                                                    <span>{tx.qty} barang ({items.length} item)</span>
+                                                                    <span className="text-[10px] text-blue font-title">
+                                                                        {isExpanded ? '▼ Tutup' : '▶ Detail'}
+                                                                    </span>
+                                                                </span>
+                                                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                                                    {discSummary.itemDiscountTotal > 0 && (
+                                                                        <span className="text-[9.5px] bg-pink-light text-pink border border-pink/50 rounded-full px-2 py-0.2 font-bold">
+                                                                            Diskon Item -{formatLogMoney(discSummary.itemDiscountTotal)}
+                                                                        </span>
+                                                                    )}
+                                                                    {discSummary.bundleDiscountTotal > 0 && (
+                                                                        <span className="text-[9.5px] bg-yellow-light text-text border border-text/40 rounded-full px-2 py-0.2 font-bold">
+                                                                            Promo -{formatLogMoney(discSummary.bundleDiscountTotal)}
+                                                                        </span>
+                                                                    )}
+                                                                    {discSummary.txDiscount > 0 && (
+                                                                        <span className="text-[9.5px] bg-pink text-white border border-text rounded-full px-2 py-0.2 font-bold">
+                                                                            Diskon Tx -{formatLogMoney(discSummary.txDiscount)}
+                                                                        </span>
+                                                                    )}
+                                                                    {!discSummary.hasAnyDiscount && (
+                                                                        <span className="text-[9.5px] text-text/55 font-normal">
+                                                                            Tanpa diskon
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </button>
+                                                        </td>
                                                         <td className="p-3 capitalize font-bold text-pink">
                                                             {tx.paymentMethod === 'cash' ? t.cash : t.qris}
+                                                            {tx.qrisRef && (
+                                                                <span className="block text-[10px] font-mono text-text/60 font-normal">{tx.qrisRef}</span>
+                                                            )}
                                                         </td>
                                                         <td className="p-3 font-bold font-title">{formatLogMoney(tx.total)}</td>
                                                         <td className="p-3">
@@ -441,7 +586,72 @@ export default function Logs({ onReprint, showToast, currentUser, userRole }) {
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                    {isExpanded && (
+                                                        <tr className="bg-yellow-light/15 border-b border-text/15">
+                                                            <td colSpan="7" className="p-3">
+                                                                <div className="bg-white border-2 border-text rounded-xl p-3 shadow-[2px_2px_0px_#181818] max-w-3xl ml-4">
+                                                                    <div className="flex justify-between items-center border-b border-text/15 pb-1.5 mb-2 text-xs">
+                                                                        <span className="font-title font-bold text-text">
+                                                                            <i className="fa-solid fa-list-check text-pink mr-1.5"></i>
+                                                                            Rincian Barang & Diskon • {tx.id}
+                                                                        </span>
+                                                                        <span className="text-[11px] font-bold text-text/70">
+                                                                            Subtotal: {formatLogMoney(tx.subtotal || 0)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1.5 text-xs">
+                                                                        {items.map((item, idx) => {
+                                                                            const itemDisc = toIntRupiah(item.discount || 0);
+                                                                            const netPrice = toIntRupiah(item.price);
+                                                                            const origPrice = toIntRupiah(item.originalPrice || (netPrice + itemDisc));
+                                                                            return (
+                                                                                <div key={idx} className="flex justify-between items-center gap-3 py-1 border-b border-dashed border-text/10 last:border-none">
+                                                                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                                                                        <span className="font-bold">{item.qty}x {item.name}</span>
+                                                                                        {itemDisc > 0 ? (
+                                                                                            <span className="text-[10px] bg-pink-light text-pink border border-pink/40 rounded-full px-2 py-0.2 font-bold">
+                                                                                                Diskon Item -{formatLogMoney(itemDisc)}/pcs ({formatLogMoney(origPrice)} → {formatLogMoney(netPrice)})
+                                                                                            </span>
+                                                                                        ) : item.fromBundle ? (
+                                                                                            <span className="text-[10px] bg-yellow-light text-text border border-text/25 rounded-full px-2 py-0.2 font-bold">
+                                                                                                Bagian Bundle ({item.fromBundle})
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="text-[10px] text-text/55">
+                                                                                                Harga Normal (Tanpa Diskon)
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <span className="font-title font-bold shrink-0">
+                                                                                        {formatLogMoney(netPrice * (item.qty || 1))}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                    {(discSummary.bundleDiscountTotal > 0 || discSummary.txDiscount > 0) && (
+                                                                        <div className="mt-2 pt-2 border-t border-dashed border-text/20 flex flex-col gap-1 text-xs">
+                                                                            {(tx.appliedBundles || []).map((b, bIdx) => (
+                                                                                <div key={bIdx} className="flex justify-between text-pink font-bold">
+                                                                                    <span>Promo Bundle: {b.bundleName}</span>
+                                                                                    <span>-{formatLogMoney(b.discount || 0)}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                            {discSummary.txDiscount > 0 && (
+                                                                                <div className="flex justify-between text-pink font-bold">
+                                                                                    <span>Diskon Transaksi:</span>
+                                                                                    <span>-{formatLogMoney(discSummary.txDiscount)}</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                    </React.Fragment>
+                                                    );
+                                                })}
                                             </React.Fragment>
                                         ))}
                                     </tbody>

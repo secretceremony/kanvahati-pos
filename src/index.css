@@ -24,32 +24,34 @@
 }
 
 /* --- Global Base Overrides --- */
-body {
-  font-family: var(--font-body);
-  color: var(--color-text);
-  min-height: 100vh;
-  background-color: var(--color-bg-base);
-  background-image: radial-gradient(#E8DFD0 1.5px, transparent 1.5px);
-  background-size: 20px 20px;
-  background-attachment: fixed;
-  overflow-x: hidden;
-  position: relative;
-  font-size: 15px;
-  line-height: 1.5;
-}
+@layer base {
+  body {
+    font-family: var(--font-body);
+    color: var(--color-text);
+    min-height: 100vh;
+    background-color: var(--color-bg-base);
+    background-image: radial-gradient(#E8DFD0 1.5px, transparent 1.5px);
+    background-size: 20px 20px;
+    background-attachment: fixed;
+    overflow-x: hidden;
+    position: relative;
+    font-size: 15px;
+    line-height: 1.5;
+  }
 
-/* --- Paper Texture Overlay --- */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  opacity: 0.03;
-  pointer-events: none;
-  z-index: 9999;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  /* --- Paper Texture Overlay --- */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    opacity: 0.03;
+    pointer-events: none;
+    z-index: 9999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
 }
 
 /* Custom Neobrutalist Scrollbars */
@@ -104,101 +106,103 @@ body::before {
   100% { opacity: 0; }
 }
 
-/* --- Custom components / utilities --- */
-.logo-stroke {
-  -webkit-text-stroke: 1px var(--color-text);
-}
+/* --- Custom components (wrapped in @layer components so Tailwind utilities like hidden/sm:flex override cleanly) --- */
+@layer components {
+  .logo-stroke {
+    -webkit-text-stroke: 1px var(--color-text);
+  }
 
-.title-stroke {
-  -webkit-text-stroke: 0.5px var(--color-text);
-}
+  .title-stroke {
+    -webkit-text-stroke: 0.5px var(--color-text);
+  }
 
-/* Retro OS Window Component */
-.retro-window-header {
-  background-color: var(--color-blue);
-  border-bottom: 2.5px solid var(--color-text);
-  padding: 6px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
+  /* Retro OS Window Component */
+  .retro-window-header {
+    background-color: var(--color-blue);
+    border-bottom: 2.5px solid var(--color-text);
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
 
-.retro-dots {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
+  .retro-dots {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
 
-.retro-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 9999px;
-  border: 1.5px solid var(--color-text);
-  display: inline-block;
-}
+  .retro-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    border: 1.5px solid var(--color-text);
+    display: inline-block;
+  }
 
-.retro-dot-red { 
-  background-color: var(--color-pink) !important; 
-}
+  .retro-dot-red { 
+    background-color: var(--color-pink) !important; 
+  }
 
-.retro-dot-yellow { 
-  background-color: var(--color-yellow) !important; 
-}
+  .retro-dot-yellow { 
+    background-color: var(--color-yellow) !important; 
+  }
 
-.retro-dot-blue { 
-  background-color: var(--color-blue) !important; 
-}
+  .retro-dot-blue { 
+    background-color: var(--color-blue) !important; 
+  }
 
-/* Neobrutalist Tag / Badge */
-.sticker-tag {
-  font-family: var(--font-tag);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border: 2px solid var(--color-text);
-  box-shadow: 2px 2px 0px var(--color-text);
-}
+  /* Neobrutalist Tag / Badge */
+  .sticker-tag {
+    font-family: var(--font-tag);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 2px solid var(--color-text);
+    box-shadow: 2px 2px 0px var(--color-text);
+  }
 
-/* Y2K Die-Cut Sticker Style (Proof of Concept reference) */
-.sticker-cutout {
-  border: 2.5px solid var(--color-text);
-  box-shadow: 4px 4px 0px var(--color-text);
-  position: relative;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
+  /* Y2K Die-Cut Sticker Style (Proof of Concept reference) */
+  .sticker-cutout {
+    border: 2.5px solid var(--color-text);
+    box-shadow: 4px 4px 0px var(--color-text);
+    position: relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
 
-.sticker-cutout:hover {
-  transform: translateY(-2px);
-  box-shadow: 5px 5px 0px var(--color-text);
-}
+  .sticker-cutout:hover {
+    transform: translateY(-2px);
+    box-shadow: 5px 5px 0px var(--color-text);
+  }
 
-/* Starburst / Explosion badge */
-.badge-starburst {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-tag);
-  font-weight: 900;
-  text-transform: uppercase;
-  border: 2px solid var(--color-text);
-  box-shadow: 2.5px 2.5px 0px var(--color-text);
-  transform: rotate(-3deg);
-}
+  /* Starburst / Explosion badge */
+  .badge-starburst {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-tag);
+    font-weight: 900;
+    text-transform: uppercase;
+    border: 2px solid var(--color-text);
+    box-shadow: 2.5px 2.5px 0px var(--color-text);
+    transform: rotate(-3deg);
+  }
 
-/* Washi tape strip decoration */
-.tape-strip {
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%) rotate(-2deg);
-  width: 55px;
-  height: 14px;
-  background-color: rgba(252, 224, 150, 0.85);
-  border-left: 1px dashed rgba(23, 23, 23, 0.4);
-  border-right: 1px dashed rgba(23, 23, 23, 0.4);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  z-index: 10;
-  pointer-events: none;
+  /* Washi tape strip decoration */
+  .tape-strip {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-2deg);
+    width: 55px;
+    height: 14px;
+    background-color: rgba(252, 224, 150, 0.85);
+    border-left: 1px dashed rgba(23, 23, 23, 0.4);
+    border-right: 1px dashed rgba(23, 23, 23, 0.4);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    z-index: 10;
+    pointer-events: none;
+  }
 }
 
 /* --- Rekapan expand animation --- */

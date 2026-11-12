@@ -95,7 +95,7 @@ export const DEFAULT_DESIGNATED_STAFF = [
 /**
  * Pre-seed all designated staff into Firestore staff_roles collection
  */
-export const seedDesignatedStaff = async (actor = null) => {
+export const seedDesignatedStaff = async () => {
     for (const staff of DEFAULT_DESIGNATED_STAFF) {
         try {
             await setDoc(doc(db, "staff_roles", staff.uid), {
@@ -112,7 +112,7 @@ export const seedDesignatedStaff = async (actor = null) => {
 /**
  * Fetch all staff roles (Auto pre-seed defaults if Firestore collection is empty)
  */
-export const fetchAllStaffRoles = async (actor = null) => {
+export const fetchAllStaffRoles = async () => {
     try {
         const snapshot = await getDocs(collection(db, "staff_roles"));
         if (!snapshot.empty) {

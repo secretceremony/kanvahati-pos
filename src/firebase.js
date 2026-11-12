@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 // Read environment config (supports Vite import.meta.env and Node process.env for tests)
-const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' ? process.env : {});
+const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof globalThis !== 'undefined' && globalThis.process?.env ? globalThis.process.env : {});
 
 export const firebaseConfig = {
     apiKey: env.VITE_FIREBASE_API_KEY || "mock-api-key",
@@ -35,7 +35,7 @@ try {
         const { getFirestore } = await import("firebase/firestore");
         firestoreDb = getFirestore(app);
     }
-} catch (e) {
+} catch {
     const { getFirestore } = await import("firebase/firestore");
     firestoreDb = getFirestore(app);
 }

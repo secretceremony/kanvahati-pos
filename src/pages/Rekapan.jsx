@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getTransactionsList, getProducts } from '../services/db';
-import { t } from '../services/translations';
 import * as XLSX from 'xlsx';
+import { formatRupiah, toIntRupiah } from '../utils/currency';
 
 // Helper: format currency
-const formatMoney = (value) => `Rp ${Math.round(value).toLocaleString('id-ID')}`;
+const formatMoney = (value) => formatRupiah(value);
 
 // Helper: get start of day
 const startOfDay = (date) => {
@@ -186,46 +186,65 @@ export default function Rekapan({ showToast }) {
         XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan');
 
         // Sheet 2: Detail Transaksi
-        const detailHeader = ['ID Pesanan', 'Waktu', 'Kasir', 'Pembayaran', 'Jumlah Barang', 'Total (Rp)'];
-        const detailRows = group.transactions.map(tx => [
-            tx.id,
-            new Date(tx.timestamp).toLocaleString('id-ID'),
-            tx.cashier || '-',
-            tx.paymentMethod === 'cash' ? 'Tunai' : 'QRIS',
-            tx.qty,
-            tx.total
-        ]);
+        const detailHeader = ['ID Pesanan', 'Waktu', 'Kasir', 'Pembayaran', 'Jumlah Barang', 'Subtotal Asli (Rp)', 'Total Diskon (Rp)', 'Total Bayar (Rp)'];
+        const detailRows = group.transactions.map(tx => {
+            const paid = tx.total || 0;
+            const subtotal = tx.subtotal || tx.items.reduce((sum, item) => sum + ((item.originalPrice || item.price || 0) * (item.qty || 1)), 0);
+            const totalDiscount = Math.max(0, subtotal - paid);
+            return [
+                tx.id,
+                new Date(tx.timestamp).toLocaleString('id-ID'),
+                tx.cashier || '-',
+                tx.paymentMethod === 'cash' ? 'Tunai' : 'QRIS',
+                tx.qty,
+                subtotal,
+                totalDiscount,
+                paid
+            ];
+        });
         const wsDetail = XLSX.utils.aoa_to_sheet([detailHeader, ...detailRows]);
         wsDetail['!cols'] = [
-            { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 16 }
+            { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 18 }
         ];
         XLSX.utils.book_append_sheet(wb, wsDetail, 'Detail Transaksi');
 
-        // Sheet 3: Detail Barang (Net Bersih setelah seluruh diskon promo dibagikan per item)
-        const itemHeader = ['ID Pesanan', 'Kode Barang', 'Nama Barang', 'Variasi', 'Qty', 'Harga Asli/Pcs (Rp)', 'Diskon/Pcs (Rp)', 'Harga Net/Pcs (Rp)', 'Subtotal Bersih (Rp)'];
+        // Sheet 3: Detail Barang (Detail per item dengan potongan asli & pembagian diskon promo tanpa desimal)
+        const itemHeader = ['ID Pesanan', 'Kode Barang', 'Nama Barang', 'Variasi', 'Qty', 'Harga Asli/Pcs (Rp)', 'Diskon/Pcs (Rp)', 'Harga Net/Pcs (Rp)', 'Subtotal Bersih (Rp)', 'Keterangan Promo / Bundle'];
         const itemRows = [];
         group.transactions.forEach(tx => {
-            const paid = tx.total || 0;
-            const rawItemsSum = tx.items.reduce((sum, item) => sum + ((item.originalPrice || item.price || 0) * (item.qty || 1)), 0);
+            const paid = toIntRupiah(tx.total || 0);
+            const rawItemsSum = tx.items.reduce((sum, item) => sum + (toIntRupiah(item.originalPrice || item.price || 0) * (parseInt(item.qty, 10) || 1)), 0);
             const txTotalDiscount = Math.max(0, rawItemsSum - paid);
 
             let allocatedDiscount = 0;
             tx.items.forEach((item, idx) => {
-                const qty = item.qty || 1;
-                const origPrice = item.originalPrice || item.price || 0;
+                const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+                const origPrice = toIntRupiah(item.originalPrice || item.price || 0);
                 const itemRawSub = origPrice * qty;
 
-                let itemDiscount = 0;
+                let itemDiscount;
                 if (idx === tx.items.length - 1) {
-                    itemDiscount = txTotalDiscount - allocatedDiscount;
+                    itemDiscount = Math.max(0, txTotalDiscount - allocatedDiscount);
                 } else {
                     itemDiscount = rawItemsSum > 0 ? Math.round((itemRawSub / rawItemsSum) * txTotalDiscount) : 0;
                     allocatedDiscount += itemDiscount;
                 }
 
-                const netSubtotal = itemRawSub - itemDiscount;
+                const netSubtotal = Math.max(0, itemRawSub - itemDiscount);
                 const discPerPcs = Math.round(itemDiscount / qty);
-                const netUnitPrice = origPrice - discPerPcs;
+                const netUnitPrice = Math.max(0, origPrice - discPerPcs);
+
+                const promoNotes = [];
+                if (item.fromBundle) {
+                    const bundleMatch = (tx.appliedBundles || []).find(b => b.bundleId === item.fromBundle);
+                    promoNotes.push(bundleMatch ? `Bundle: ${bundleMatch.bundleName}` : `Bundle (${item.fromBundle})`);
+                }
+                if (toIntRupiah(item.discount || 0) > 0) {
+                    promoNotes.push(`Diskon Item: Rp ${toIntRupiah(item.discount).toLocaleString('id-ID')}/pcs`);
+                }
+                if (toIntRupiah(tx.transactionDiscount || 0) > 0) {
+                    promoNotes.push(`Potongan Tx: Rp ${toIntRupiah(tx.transactionDiscount).toLocaleString('id-ID')}`);
+                }
 
                 itemRows.push([
                     tx.id,
@@ -236,13 +255,14 @@ export default function Rekapan({ showToast }) {
                     origPrice,
                     discPerPcs,
                     netUnitPrice,
-                    netSubtotal
+                    netSubtotal,
+                    promoNotes.length > 0 ? promoNotes.join(' • ') : 'Normal'
                 ]);
             });
         });
         const wsItems = XLSX.utils.aoa_to_sheet([itemHeader, ...itemRows]);
         wsItems['!cols'] = [
-            { wch: 14 }, { wch: 14 }, { wch: 26 }, { wch: 16 }, { wch: 6 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 18 }
+            { wch: 14 }, { wch: 14 }, { wch: 26 }, { wch: 16 }, { wch: 6 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 32 }
         ];
         XLSX.utils.book_append_sheet(wb, wsItems, 'Detail Barang');
 
@@ -309,10 +329,13 @@ export default function Rekapan({ showToast }) {
         XLSX.utils.book_append_sheet(wb, wsOverview, 'Ringkasan');
 
         // Sheet 2: All transactions detail
-        const detailHeader = ['Periode', 'ID Pesanan', 'Waktu', 'Kasir', 'Pembayaran', 'Jumlah Barang', 'Total (Rp)'];
+        const detailHeader = ['Periode', 'ID Pesanan', 'Waktu', 'Kasir', 'Pembayaran', 'Jumlah Barang', 'Subtotal Asli (Rp)', 'Total Diskon (Rp)', 'Total Bayar (Rp)'];
         const detailRows = [];
         groupedData.forEach(g => {
             g.transactions.forEach(tx => {
+                const paid = tx.total || 0;
+                const subtotal = tx.subtotal || tx.items.reduce((sum, item) => sum + ((item.originalPrice || item.price || 0) * (item.qty || 1)), 0);
+                const totalDiscount = Math.max(0, subtotal - paid);
                 detailRows.push([
                     formatPeriodLabel(g.key, mode),
                     tx.id,
@@ -320,13 +343,15 @@ export default function Rekapan({ showToast }) {
                     tx.cashier || '-',
                     tx.paymentMethod === 'cash' ? 'Tunai' : 'QRIS',
                     tx.qty,
-                    tx.total
+                    subtotal,
+                    totalDiscount,
+                    paid
                 ]);
             });
         });
         const wsDetail = XLSX.utils.aoa_to_sheet([detailHeader, ...detailRows]);
         wsDetail['!cols'] = [
-            { wch: 28 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 16 }
+            { wch: 28 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 18 }
         ];
         XLSX.utils.book_append_sheet(wb, wsDetail, 'Semua Transaksi');
 

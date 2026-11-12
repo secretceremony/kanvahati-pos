@@ -1,5 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {
+    toIntRupiah,
+    sanitizeIntegerInput,
+    formatRupiah,
+    calculateTicketTotals,
+    applyDiscountPurgeToProducts
+} from '../src/utils/currency.js';
 
 test('POS Core Business Logic Regression Suite', async (t) => {
     // 1. Transaction Totals Calculation
@@ -154,5 +161,51 @@ test('POS Core Business Logic Regression Suite', async (t) => {
         assert.equal(orig, 55000);
         assert.equal(savings, 10000);
         assert.equal(Math.round((savings / orig) * 100), 18);
+    });
+
+    // 8. Integer-Only Rupiah & No Decimals
+    await t.test('toIntRupiah, sanitizeIntegerInput, dan formatRupiah membuang angka desimal', () => {
+        assert.equal(toIntRupiah('15000.75'), 15001);
+        assert.equal(toIntRupiah(-500), 0);
+        assert.equal(toIntRupiah(''), 0);
+        assert.equal(sanitizeIntegerInput('12.500,99abc'), '1250099');
+        assert.equal(formatRupiah(25000.4), 'Rp 25.000');
+    });
+
+    // 9. Zero-Discount & Transaction-Level Discount Totals
+    await t.test('calculateTicketTotals menjaga transaksi tanpa diskon tetap 0 dan memotong diskon transaksi secara bulat', () => {
+        const plainTicket = [
+            { id: 'P1', name: 'Sticker', price: 15000, originalPrice: 15000, discount: 0, qty: 2 }
+        ];
+        const noDisc = calculateTicketTotals(plainTicket, [], '');
+        assert.equal(noDisc.totalItemDiscount, 0);
+        assert.equal(noDisc.bundleDiscount, 0);
+        assert.equal(noDisc.transactionDiscount, 0);
+        assert.equal(noDisc.hasAnyDiscount, false);
+        assert.equal(noDisc.total, 30000);
+
+        const withTxDisc = calculateTicketTotals(plainTicket, [], '5000');
+        assert.equal(withTxDisc.transactionDiscount, 5000);
+        assert.equal(withTxDisc.hasAnyDiscount, true);
+        assert.equal(withTxDisc.total, 25000);
+
+        const clamped = calculateTicketTotals(plainTicket, [], '999999');
+        assert.equal(clamped.transactionDiscount, 30000);
+        assert.equal(clamped.total, 0);
+    });
+
+    // 10. Purge All Discounts Helper
+    await t.test('applyDiscountPurgeToProducts mereset semua diskon item dan variasi ke 0 tanpa menyentuh item normal', () => {
+        const prods = [
+            { id: 'A', price: 20000, discount: 5000, variations: [] },
+            { id: 'B', price: 30000, discount: 0, variations: [{ name: 'Red', price: 30000, discount: 3000 }, { name: 'Blue', price: 30000, discount: 0 }] },
+            { id: 'C', price: 10000, discount: 0, variations: [] }
+        ];
+        const res = applyDiscountPurgeToProducts(prods);
+        assert.equal(res.updatedProductsCount, 2);
+        assert.equal(res.updatedVariationsCount, 1);
+        assert.equal(res.nextProducts[0].discount, 0);
+        assert.equal(res.nextProducts[1].variations[0].discount, 0);
+        assert.equal(res.nextProducts[2], prods[2]);
     });
 });

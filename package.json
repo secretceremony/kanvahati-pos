@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test tests/full-functional-qa.test.mjs tests/booth-simulation.test.mjs tests/visitor-display-sync.test.mjs tests/host-console-integration.test.mjs tests/arcade-core-and-data.test.mjs tests/arcade-spec.test.mjs tests/pos-regression.test.mjs tests/security-rules.test.mjs",
+    "test": "node --test tests/full-functional-qa.test.mjs tests/booth-simulation.test.mjs tests/visitor-display-sync.test.mjs tests/host-console-integration.test.mjs tests/arcade-core-and-data.test.mjs tests/arcade-spec.test.mjs tests/arcade-v2.test.mjs tests/pos-regression.test.mjs tests/security-rules.test.mjs tests/qris.test.mjs",
     "test:emulator": "firebase emulators:exec --only firestore 'node tests/security-rules-emulator.test.mjs'",
     "test:all": "npm run test && npm run test:emulator",
     "screenshots": "node scripts/capture-real-screenshots.mjs"
@@ -16,6 +16,8 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "firebase": "^10.0.0",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.18.0",

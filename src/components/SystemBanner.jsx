@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { APP_VERSION } from '../config';
@@ -11,7 +11,7 @@ export default function SystemBanner() {
     const [dataUpdateAvailable, setDataUpdateAvailable] = useState(false);
     const [versionUpdateAvailable, setVersionUpdateAvailable] = useState(false);
     const [announcement, setAnnouncement] = useState("");
-    const [initialLoadTime] = useState(Date.now());
+    const [initialLoadTime] = useState(() => Date.now());
 
     useEffect(() => {
         const updateNetworkStatus = async () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getTransactionsList, getProducts, getCategories } from '../services/db';
 import { t } from '../services/translations';
 
@@ -13,102 +13,97 @@ export default function Stats() {
     });
     const [loading, setLoading] = useState(true);
 
-    const loadStatsData = async () => {
-        try {
-            setLoading(true);
-            const txs = await getTransactionsList();
-            const prods = await getProducts();
-            const cats = await getCategories();
-
-            let totalRevenue = 0;
-            let totalItemsSold = 0;
-            const totalOrders = txs.length;
-
-            const categorySales = {};
-            cats.forEach(c => {
-                categorySales[c] = { qty: 0, revenue: 0 };
-            });
-
-            // Fast O(1) Product lookup index map
-            const prodsMap = new Map();
-            prods.forEach(p => prodsMap.set(p.id, p));
-
-            // Product leaderboard accumulator
-            const prodStatsMap = new Map();
-            // Daily accumulator for peak sales day
-            const dailyStatsMap = new Map();
-
-            txs.forEach(tx => {
-                totalRevenue += tx.total;
-                totalItemsSold += tx.qty;
-
-                // Day grouping key
-                const dateKey = new Date(tx.timestamp).toISOString().split('T')[0];
-                if (!dailyStatsMap.has(dateKey)) {
-                    dailyStatsMap.set(dateKey, { date: dateKey, revenue: 0, orders: 0, qty: 0 });
-                }
-                const dStat = dailyStatsMap.get(dateKey);
-                dStat.revenue += tx.total;
-                dStat.orders += 1;
-                dStat.qty += tx.qty;
-
-                tx.items.forEach(item => {
-                    const originalProduct = prodsMap.get(item.id);
-                    const category = originalProduct ? originalProduct.category : 'stickers';
-                    if (!categorySales[category]) {
-                        categorySales[category] = { qty: 0, revenue: 0 };
-                    }
-                    const itemSubtotal = (item.price || 0) * (item.qty || 1);
-                    categorySales[category].qty += item.qty;
-                    categorySales[category].revenue += itemSubtotal;
-
-                    // Leaderboard
-                    const pKey = item.id;
-                    if (!prodStatsMap.has(pKey)) {
-                        prodStatsMap.set(pKey, {
-                            id: item.id,
-                            name: item.name,
-                            category,
-                            qty: 0,
-                            revenue: 0
-                        });
-                    }
-                    const pStat = prodStatsMap.get(pKey);
-                    pStat.qty += item.qty;
-                    pStat.revenue += itemSubtotal;
-                });
-            });
-
-            // Rank Top 5 products by quantity
-            const topProducts = Array.from(prodStatsMap.values())
-                .sort((a, b) => b.qty - a.qty || b.revenue - a.revenue)
-                .slice(0, 5);
-
-            // Find Peak Sales Day
-            let peakSalesDay = null;
-            if (dailyStatsMap.size > 0) {
-                peakSalesDay = Array.from(dailyStatsMap.values()).reduce((max, cur) => 
-                    cur.revenue > (max ? max.revenue : 0) ? cur : max
-                , null);
-            }
-
-            setStats({
-                totalRevenue,
-                totalItemsSold,
-                totalOrders,
-                categorySales,
-                topProducts,
-                peakSalesDay
-            });
-        } catch (e) {
-            console.error("Failed to load statistics", e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        loadStatsData();
+        let mounted = true;
+        (async () => {
+            try {
+                const [txs, prods, cats] = await Promise.all([
+                    getTransactionsList(),
+                    getProducts(),
+                    getCategories()
+                ]);
+                if (!mounted) return;
+
+                let totalRevenue = 0;
+                let totalItemsSold = 0;
+                const totalOrders = txs.length;
+
+                const categorySales = {};
+                cats.forEach(c => {
+                    categorySales[c] = { qty: 0, revenue: 0 };
+                });
+
+                const prodsMap = new Map();
+                prods.forEach(p => prodsMap.set(p.id, p));
+
+                const prodStatsMap = new Map();
+                const dailyStatsMap = new Map();
+
+                txs.forEach(tx => {
+                    totalRevenue += tx.total;
+                    totalItemsSold += tx.qty;
+
+                    const dateKey = new Date(tx.timestamp).toISOString().split('T')[0];
+                    if (!dailyStatsMap.has(dateKey)) {
+                        dailyStatsMap.set(dateKey, { date: dateKey, revenue: 0, orders: 0, qty: 0 });
+                    }
+                    const dStat = dailyStatsMap.get(dateKey);
+                    dStat.revenue += tx.total;
+                    dStat.orders += 1;
+                    dStat.qty += tx.qty;
+
+                    tx.items.forEach(item => {
+                        const originalProduct = prodsMap.get(item.id);
+                        const category = originalProduct ? originalProduct.category : 'stickers';
+                        if (!categorySales[category]) {
+                            categorySales[category] = { qty: 0, revenue: 0 };
+                        }
+                        const itemSubtotal = (item.price || 0) * (item.qty || 1);
+                        categorySales[category].qty += item.qty;
+                        categorySales[category].revenue += itemSubtotal;
+
+                        const pKey = item.id;
+                        if (!prodStatsMap.has(pKey)) {
+                            prodStatsMap.set(pKey, {
+                                id: item.id,
+                                name: item.name,
+                                category,
+                                qty: 0,
+                                revenue: 0
+                            });
+                        }
+                        const pStat = prodStatsMap.get(pKey);
+                        pStat.qty += item.qty;
+                        pStat.revenue += itemSubtotal;
+                    });
+                });
+
+                const topProducts = Array.from(prodStatsMap.values())
+                    .sort((a, b) => b.qty - a.qty || b.revenue - a.revenue)
+                    .slice(0, 5);
+
+                let peakSalesDay = null;
+                if (dailyStatsMap.size > 0) {
+                    peakSalesDay = Array.from(dailyStatsMap.values()).reduce((max, cur) =>
+                        cur.revenue > (max ? max.revenue : 0) ? cur : max
+                    , null);
+                }
+
+                setStats({
+                    totalRevenue,
+                    totalItemsSold,
+                    totalOrders,
+                    categorySales,
+                    topProducts,
+                    peakSalesDay
+                });
+            } catch (e) {
+                console.error("Failed to load statistics", e);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        })();
+        return () => { mounted = false; };
     }, []);
 
     // Find highest category quantity to scale relative percentages

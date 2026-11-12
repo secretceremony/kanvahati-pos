@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import { 
     getProducts, 
     saveProduct, 
     deleteProduct, 
-    updateProductStock, 
+    adjustProductStock,
     getCategories, 
     saveCategory, 
     deleteCategory,
@@ -13,6 +13,8 @@ import {
 } from '../services/db';
 import * as XLSX from 'xlsx';
 import { recordAuditLog } from '../services/audit';
+import { compressImageFile, resolveProductImageUrl } from '../utils/imageHelper';
+import { formatRupiah, sanitizeIntegerInput, toIntRupiah } from '../utils/currency';
 import { t } from '../services/translations';
 import ProductCardMobile from '../components/inventory/ProductCardMobile';
 
@@ -26,12 +28,14 @@ export default function Inventory({ showToast, currentUser, userRole }) {
     const [newCategoryName, setNewCategoryName] = useState('');
 
     // Form Fields State
-    const [id, setId] = useState('');
+    const [manualId, setManualId] = useState('');
     const [name, setName] = useState('');
     const [price, setPrice] = useState('');
     const [category, setCategory] = useState('stickers');
     const [stock, setStock] = useState('10');
     const [tag, setTag] = useState('');
+    const [productImg, setProductImg] = useState('');
+    const [imgCompressing, setImgCompressing] = useState(false);
 
     // Variations State
     const [hasVariations, setHasVariations] = useState(false);
@@ -43,9 +47,11 @@ export default function Inventory({ showToast, currentUser, userRole }) {
     // Table UI State
     const [expandedProductId, setExpandedProductId] = useState(null);
 
-    // Restock Modal Target State
+    // Restock / Stock Adjust Modal Target State
     const [restockTarget, setRestockTarget] = useState(null);
     const [restockAmount, setRestockAmount] = useState('10');
+    const [stockAdjustMode, setStockAdjustMode] = useState('add'); // 'add' | 'sub' | 'set'
+    const [stockAdjustReason, setStockAdjustReason] = useState('Restok');
 
     // Bulk delete and Editing states
     const [selectedProducts, setSelectedProducts] = useState([]);
@@ -55,6 +61,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
     const [filterVisibility, setFilterVisibility] = useState('all'); // all, visible, hidden
+    const [filterStockHealth, setFilterStockHealth] = useState('all'); // all, low, out
     const [sortBy, setSortBy] = useState('name_asc'); // name_asc, name_desc, price_asc, price_desc, stock_asc, stock_desc
     const [pageSize, setPageSize] = useState(20); // 20, 40, 60
     const [currentPage, setCurrentPage] = useState(1);
@@ -134,16 +141,26 @@ export default function Inventory({ showToast, currentUser, userRole }) {
         return `${matchingPrefix}-${suffix}`;
     };
 
-    useEffect(() => {
-        if (!loading) {
-            const nextId = generateNextId(name, category, products);
-            setId(nextId);
-        }
-    }, [name, category, products, loading]);
+    const id = manualId || (loading ? '' : generateNextId(name, category, products));
 
     useEffect(() => {
-        fetchProducts();
-        fetchCategoriesList();
+        let mounted = true;
+        (async () => {
+            try {
+                const [prodData, catData] = await Promise.all([getProducts(), getCategories()]);
+                if (!mounted) return;
+                setProducts(prodData);
+                setCategories(catData);
+                if (catData.length > 0) {
+                    setCategory(prev => (catData.includes(prev) ? prev : catData[0]));
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        })();
+        return () => { mounted = false; };
     }, []);
 
     // Category additions
@@ -162,7 +179,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             showToast("Kategori baru berhasil ditambahkan!", "🎉");
             setNewCategoryName('');
             fetchCategoriesList();
-        } catch (err) {
+        } catch {
             showToast("Gagal menyimpan kategori", "⚠️");
         }
     };
@@ -174,7 +191,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 await deleteCategory(catName);
                 showToast("Kategori berhasil dihapus!", "🗑️");
                 fetchCategoriesList();
-            } catch (err) {
+            } catch {
                 showToast("Gagal menghapus kategori", "⚠️");
             }
         }
@@ -194,11 +211,11 @@ export default function Inventory({ showToast, currentUser, userRole }) {
 
         try {
             await updateCategoryName(oldCatName, cleanNew);
-            showToast("Kategori berhasil diperbarui!", "🎉");
+            showToast("Kategori berhasil diperbarui!", "✨");
             fetchCategoriesList();
             fetchProducts();
-        } catch (err) {
-            showToast("Gagal mengubah kategori", "⚠️");
+        } catch {
+            showToast("Gagal mengubah nama kategori", "⚠️");
         }
     };
 
@@ -219,6 +236,20 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             }
             return item;
         }));
+    };
+
+    const handleImageFileSelect = async (file, onDone) => {
+        if (!file) return;
+        setImgCompressing(true);
+        try {
+            const compressed = await compressImageFile(file);
+            onDone(compressed);
+            showToast('Gambar produk berhasil dikompres & dipasang!', '🖼️');
+        } catch (err) {
+            showToast(err.message || 'Gagal memproses gambar', '⚠️');
+        } finally {
+            setImgCompressing(false);
+        }
     };
 
     // Add Product Form submit
@@ -242,28 +273,27 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             return;
         }
 
-        let calculatedPrice = parseFloat(price);
-        let calculatedStock = parseInt(stock);
+        let calculatedPrice = toIntRupiah(price);
+        let calculatedStock = parseInt(stock, 10) || 0;
         let finalVariations = [];
 
         if (hasVariations) {
             let listToValidate = variationsList;
             if (uniformVariantPrice) {
-                const uPrice = parseFloat(masterVariantPrice);
-                const uDiscount = parseFloat(masterVariantDiscount || 0);
-                if (isNaN(uPrice) || uPrice <= 0) {
+                const uPrice = toIntRupiah(masterVariantPrice);
+                if (!masterVariantPrice || uPrice <= 0) {
                     showToast("Masukkan harga seragam yang valid untuk variasi!", "⚠️");
                     return;
                 }
                 listToValidate = variationsList.map(v => ({
                     ...v,
-                    price: masterVariantPrice,
-                    discount: masterVariantDiscount || '0'
+                    price: String(uPrice),
+                    discount: String(toIntRupiah(masterVariantDiscount || 0))
                 }));
             }
 
             // Validate variations list
-            const invalid = listToValidate.some(v => !v.name.trim() || !v.price || isNaN(v.price) || parseFloat(v.price) <= 0 || !v.stock || isNaN(v.stock));
+            const invalid = listToValidate.some(v => !v.name.trim() || !v.price || toIntRupiah(v.price) <= 0 || v.stock === '' || isNaN(v.stock));
             if (invalid) {
                 showToast("Semua baris variasi harus terisi secara valid!", "⚠️");
                 return;
@@ -271,9 +301,9 @@ export default function Inventory({ showToast, currentUser, userRole }) {
 
             finalVariations = listToValidate.map(v => ({
                 name: v.name.trim(),
-                price: parseFloat(v.price),
-                stock: parseInt(v.stock),
-                discount: parseFloat(v.discount || 0)
+                price: toIntRupiah(v.price),
+                stock: parseInt(v.stock, 10) || 0,
+                discount: toIntRupiah(v.discount || 0)
             }));
 
             // overall price defaults to first variation's price
@@ -281,7 +311,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             // overall stock is the sum of variations stock
             calculatedStock = finalVariations.reduce((sum, v) => sum + v.stock, 0);
         } else {
-            if (!price || isNaN(price) || parseFloat(price) <= 0) {
+            if (!price || calculatedPrice <= 0) {
                 showToast(t.invalidPrice || "Format harga salah!", "⚠️");
                 return;
             }
@@ -295,7 +325,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             category,
             stock: calculatedStock,
             tag,
-            img: 'assets/mascot.png', // Default placeholder mascot
+            img: productImg.trim() || 'assets/mascot.png',
             variations: finalVariations
         };
 
@@ -323,54 +353,71 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             showToast(t.addSuccess || "Produk ditambahkan!", "🎉");
             
             // Reset form
-            setId('');
+            setManualId('');
             setName('');
             setPrice('');
             setTag('');
+            setProductImg('');
             setStock('10');
             setHasVariations(false);
             setVariationsList([{ name: '', price: '', stock: '10' }]);
             
             fetchProducts(); // Refresh table view
-        } catch (err) {
+        } catch {
             showToast("Gagal menyimpan produk", "⚠️");
         }
     };
 
-    // Open Custom Restock Modal Target
+    // Open Custom Restock / Stock Adjust Modal Target
     const handleRestockClick = (product, variationName = null) => {
         setRestockTarget({ product, variationName });
+        setStockAdjustMode('add');
         setRestockAmount('10');
+        setStockAdjustReason('Restok');
     };
 
-    // Execute Custom Stock addition
+    // Execute Unified Stock Adjustment (Add, Subtract, or Set Exact Opname) with Audit Trail
     const handleRestockSubmit = async (e) => {
         e.preventDefault();
-        const amount = parseInt(restockAmount);
-        if (isNaN(amount) || amount <= 0) {
+        const amount = parseInt(restockAmount, 10);
+        if (isNaN(amount) || amount < 0 || (stockAdjustMode !== 'set' && amount <= 0)) {
             showToast("Masukkan jumlah stok yang valid!", "⚠️");
             return;
         }
 
         const product = restockTarget.product;
         const variationName = restockTarget.variationName;
-
-        let newStock;
-        if (variationName && product.variations && product.variations.length > 0) {
-            const variation = product.variations.find(v => v.name === variationName);
-            newStock = variation ? variation.stock + amount : amount;
-        } else {
-            newStock = product.stock + amount;
-        }
+        const mode = stockAdjustMode === 'set' ? 'set' : 'delta';
+        const value = stockAdjustMode === 'sub' ? -amount : amount;
 
         try {
-            await updateProductStock(product.id, newStock, variationName);
-            showToast(`Stok "${product.name}${variationName ? ` (${variationName})` : ''}" berhasil ditambah (+${amount})!`, "📦");
+            const res = await adjustProductStock(product.id, { mode, value, variationName });
+            const targetLabel = `${product.name}${variationName ? ` (${variationName})` : ''}`;
+            await recordAuditLog({
+                action: 'STOCK_ADJUST',
+                summary: `Stok "${targetLabel}" diubah ${res.prevStock} -> ${res.nextStock} (${stockAdjustReason || stockAdjustMode})`,
+                actor: {
+                    uid: currentUser?.uid,
+                    email: currentUser?.email,
+                    displayName: currentUser?.displayName || 'Staf',
+                    role: userRole
+                },
+                details: {
+                    productId: product.id,
+                    variationName,
+                    mode: stockAdjustMode,
+                    inputAmount: amount,
+                    prevStock: res.prevStock,
+                    nextStock: res.nextStock,
+                    reason: stockAdjustReason
+                }
+            });
+            showToast(`Stok "${targetLabel}" sekarang ${res.nextStock} pcs!`, "📦");
             setRestockTarget(null);
             setRestockAmount('10');
             fetchProducts();
-        } catch (err) {
-            showToast("Gagal menambah stok", "⚠️");
+        } catch {
+            showToast("Gagal memperbarui stok", "⚠️");
         }
     };
 
@@ -395,7 +442,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 // Clear from selection if deleted
                 setSelectedProducts(prev => prev.filter(id => id !== productId));
                 fetchProducts();
-            } catch (err) {
+            } catch {
                 showToast("Gagal menghapus produk", "⚠️");
             }
         }
@@ -410,8 +457,8 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 showToast(`${selectedProducts.length} produk berhasil dihapus!`, "🗑️");
                 setSelectedProducts([]);
                 fetchProducts();
-            } catch (err) {
-                showToast("Gagal menghapus produk secara massal", "⚠️");
+            } catch {
+                showToast("Gagal menghapus produk terpilih", "⚠️");
             }
         }
     };
@@ -437,6 +484,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             discount: (product.discount || 0).toString(),
             stock: product.stock.toString(),
             tag: product.tag || '',
+            img: product.img || '',
             hiddenFromCatalogue: Boolean(product.hiddenFromCatalogue),
             hasVariations: hasVars,
             uniformVariantPrice: isUniform,
@@ -484,28 +532,27 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             return;
         }
 
-        let calculatedPrice = parseFloat(editingProduct.price);
-        let calculatedStock = parseInt(editingProduct.stock);
+        let calculatedPrice = toIntRupiah(editingProduct.price);
+        let calculatedStock = parseInt(editingProduct.stock, 10) || 0;
         let finalVariations = [];
 
         if (editingProduct.hasVariations) {
             let listToValidate = editingProduct.variationsList;
             if (editingProduct.uniformVariantPrice) {
-                const uPrice = parseFloat(editingProduct.masterVariantPrice);
-                const uDiscount = parseFloat(editingProduct.masterVariantDiscount || 0);
-                if (isNaN(uPrice) || uPrice <= 0) {
+                const uPrice = toIntRupiah(editingProduct.masterVariantPrice);
+                if (!editingProduct.masterVariantPrice || uPrice <= 0) {
                     showToast("Masukkan harga seragam yang valid untuk variasi!", "⚠️");
                     return;
                 }
                 listToValidate = editingProduct.variationsList.map(v => ({
                     ...v,
-                    price: editingProduct.masterVariantPrice,
-                    discount: editingProduct.masterVariantDiscount || '0'
+                    price: String(uPrice),
+                    discount: String(toIntRupiah(editingProduct.masterVariantDiscount || 0))
                 }));
             }
 
             // Validate variations list
-            const invalid = listToValidate.some(v => !v.name.trim() || !v.price || isNaN(v.price) || parseFloat(v.price) <= 0 || !v.stock || isNaN(v.stock));
+            const invalid = listToValidate.some(v => !v.name.trim() || !v.price || toIntRupiah(v.price) <= 0 || v.stock === '' || isNaN(v.stock));
             if (invalid) {
                 showToast("Semua baris variasi harus terisi secara valid!", "⚠️");
                 return;
@@ -513,15 +560,15 @@ export default function Inventory({ showToast, currentUser, userRole }) {
 
             finalVariations = listToValidate.map(v => ({
                 name: v.name.trim(),
-                price: parseFloat(v.price),
-                stock: parseInt(v.stock),
-                discount: parseFloat(v.discount || 0)
+                price: toIntRupiah(v.price),
+                stock: parseInt(v.stock, 10) || 0,
+                discount: toIntRupiah(v.discount || 0)
             }));
 
             calculatedPrice = finalVariations[0].price;
             calculatedStock = finalVariations.reduce((sum, v) => sum + v.stock, 0);
         } else {
-            if (!editingProduct.price || isNaN(editingProduct.price) || parseFloat(editingProduct.price) <= 0) {
+            if (!editingProduct.price || calculatedPrice <= 0) {
                 showToast("Format harga salah!", "⚠️");
                 return;
             }
@@ -531,12 +578,12 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             id: editingProduct.id,
             name: editingProduct.name,
             price: calculatedPrice,
-            discount: editingProduct.hasVariations ? 0 : parseFloat(editingProduct.discount || 0),
+            discount: editingProduct.hasVariations ? 0 : toIntRupiah(editingProduct.discount || 0),
             category: editingProduct.category,
             stock: calculatedStock,
             tag: editingProduct.tag,
             hiddenFromCatalogue: Boolean(editingProduct.hiddenFromCatalogue),
-            img: 'assets/mascot.png', // Default placeholder mascot
+            img: (editingProduct.img && editingProduct.img.trim()) ? editingProduct.img.trim() : 'assets/mascot.png',
             variations: finalVariations
         };
 
@@ -610,15 +657,20 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             showToast("Produk berhasil diperbarui!", "🌸");
             setEditingProduct(null);
             fetchProducts(); // Refresh table view
-        } catch (err) {
+        } catch {
             showToast("Gagal memperbarui produk", "⚠️");
         }
     };
 
-    // Price formatting helper
-    const formatPrice = (priceVal) => {
-        return `Rp ${priceVal.toLocaleString('id-ID')}`;
-    };
+    // Price formatting helper (strictly integer Rupiah)
+    const formatPrice = (priceVal) => formatRupiah(priceVal);
+
+    // Stock health counters (replaces unused trigger check)
+    const stockSummary = useMemo(() => {
+        const outCount = products.filter(p => (p.stock || 0) <= 0).length;
+        const lowCount = products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) <= 5).length;
+        return { outCount, lowCount };
+    }, [products]);
 
     // Filter, search, and sort products
     const processedProducts = products.filter(p => {
@@ -629,7 +681,10 @@ export default function Inventory({ showToast, currentUser, userRole }) {
         const matchesVisibility = filterVisibility === 'all' ||
             (filterVisibility === 'visible' && !p.hiddenFromCatalogue) ||
             (filterVisibility === 'hidden' && p.hiddenFromCatalogue);
-        return matchesSearch && matchesCategory && matchesVisibility;
+        const matchesStockHealth = filterStockHealth === 'all' ||
+            (filterStockHealth === 'out' && (p.stock || 0) <= 0) ||
+            (filterStockHealth === 'low' && (p.stock || 0) > 0 && (p.stock || 0) <= 5);
+        return matchesSearch && matchesCategory && matchesVisibility && matchesStockHealth;
     }).sort((a, b) => {
         if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
         if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
@@ -640,9 +695,32 @@ export default function Inventory({ showToast, currentUser, userRole }) {
         return 0;
     });
 
-    // Pagination calculations
+    // Pagination calculations (clamp activePage so deleting/filtering never leaves blank page)
     const totalPages = Math.max(1, Math.ceil(processedProducts.length / pageSize));
-    const paginatedProducts = processedProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const paginatedProducts = processedProducts.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize);
+
+    // Export current live inventory to XLSX
+    const handleExportStockXlsx = () => {
+        const rows = products.map(p => ({
+            "ID (Opsional, kosongkan utk auto)": p.id,
+            "Nama Produk": p.name,
+            "Kategori": p.category,
+            "Harga": p.price,
+            "Stok": p.stock,
+            "Diskon (Opsional)": p.discount || 0,
+            "Tag (Opsional)": p.tag || '',
+            "Sembunyikan Katalog (TRUE/FALSE)": p.hiddenFromCatalogue ? 'TRUE' : 'FALSE',
+            "Variasi Format (Nama:Harga:Stok:Diskon|...)": (p.variations || [])
+                .map(v => `${v.name}:${v.price}:${v.stock}:${v.discount || 0}`)
+                .join('|')
+        }));
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Stok Barang');
+        XLSX.writeFile(wb, `Kanvahati_Stok_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        showToast('Stok saat ini berhasil diexport ke XLSX!', '📊');
+    };
 
     // Toggle hide from catalogue
     const handleToggleCatalogueVisibility = async (product) => {
@@ -663,7 +741,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             });
             showToast(`"${product.name}" ${newHiddenState ? 'disembunyikan dari' : 'ditampilkan di'} katalog!`, "👁️");
             fetchProducts();
-        } catch (e) {
+        } catch {
             showToast("Gagal mengubah status visibilitas katalog", "⚠️");
         }
     };
@@ -700,7 +778,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             });
             showToast(`Slot kosong (${emptySlotItem.id}) berhasil dibuat!`, "🔲");
             fetchProducts();
-        } catch (e) {
+        } catch {
             showToast("Gagal membuat slot kosong", "⚠️");
         }
     };
@@ -748,51 +826,47 @@ export default function Inventory({ showToast, currentUser, userRole }) {
         showToast("Template XLSX Produk berhasil diunduh!", "📊");
     };
 
-    // Parse and handle CSV file for Items
+    // Parse and handle CSV or XLSX file for Items
     const handleCsvFileUpload = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        const isSpreadsheet = /\.(xlsx|xls)$/i.test(file.name);
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {
-                const text = evt.target.result;
-                const lines = text.split(String.fromCharCode(10)).filter(line => line.trim() !== "");
-                if (lines.length < 2) {
-                    showToast("File CSV kosong atau tidak valid!", "⚠️");
+                const wb = isSpreadsheet
+                    ? XLSX.read(new Uint8Array(evt.target.result), { type: 'array' })
+                    : XLSX.read(evt.target.result, { type: 'string' });
+                const firstSheet = wb.SheetNames[0];
+                const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { defval: '' });
+
+                if (!rawRows || rawRows.length === 0) {
+                    showToast("File kosong atau tidak memiliki baris data!", "⚠️");
                     return;
                 }
 
-                const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                const existingMap = new Map(products.map(p => [p.id.toUpperCase(), p]));
                 const previewRows = [];
                 const errors = [];
 
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i];
-                    // Simple regex CSV splitter handling quotes
-                    const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
-                    const cleanValues = values.map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
-
-                    const rowObj = {};
-                    headers.forEach((h, idx) => {
-                        rowObj[h] = cleanValues[idx] !== undefined ? cleanValues[idx] : '';
-                    });
-
-                    const name = rowObj["Nama Produk"] || rowObj["name"] || rowObj["Nama"] || cleanValues[1] || '';
+                rawRows.forEach((rowObj, idx) => {
+                    const rowNum = idx + 2;
+                    const name = String(rowObj["Nama Produk"] || rowObj["name"] || rowObj["Nama"] || '').trim();
                     if (!name) {
-                        errors.push(`Baris ${i + 1}: Nama produk kosong.`);
-                        continue;
+                        errors.push(`Baris ${rowNum}: Nama produk kosong.`);
+                        return;
                     }
 
-                    const rawId = rowObj["ID"] || rowObj["id"] || rowObj["ID (Opsional, kosongkan utk auto)"] || cleanValues[0] || '';
-                    const category = (rowObj["Kategori"] || rowObj["category"] || cleanValues[2] || 'stickers').trim().toLowerCase();
-                    const price = parseFloat(rowObj["Harga"] || rowObj["price"] || cleanValues[3] || 0);
-                    const stock = parseInt(rowObj["Stok"] || rowObj["stock"] || cleanValues[4] || 0);
-                    const discount = parseFloat(rowObj["Diskon"] || rowObj["discount"] || cleanValues[5] || 0);
-                    const tag = rowObj["Tag"] || rowObj["tag"] || cleanValues[6] || '';
-                    const hiddenRaw = String(rowObj["Sembunyikan Katalog"] || rowObj["hiddenFromCatalogue"] || cleanValues[7] || '').toUpperCase();
+                    const rawId = String(rowObj["ID"] || rowObj["id"] || rowObj["ID (Opsional, kosongkan utk auto)"] || '').trim();
+                    const category = String(rowObj["Kategori"] || rowObj["category"] || 'stickers').trim().toLowerCase() || 'stickers';
+                    const price = toIntRupiah(rowObj["Harga"] || rowObj["price"] || 0);
+                    const stockVal = parseInt(rowObj["Stok"] || rowObj["stock"] || 0, 10) || 0;
+                    const discount = toIntRupiah(rowObj["Diskon"] || rowObj["Diskon (Opsional)"] || rowObj["discount"] || 0);
+                    const tag = String(rowObj["Tag"] || rowObj["Tag (Opsional)"] || rowObj["tag"] || '').trim();
+                    const hiddenRaw = String(rowObj["Sembunyikan Katalog"] || rowObj["Sembunyikan Katalog (TRUE/FALSE)"] || rowObj["hiddenFromCatalogue"] || '').toUpperCase();
                     const hiddenFromCatalogue = hiddenRaw === 'TRUE' || hiddenRaw === '1' || hiddenRaw === 'YA';
-                    const variationsRaw = rowObj["Variasi"] || rowObj["variations"] || cleanValues[8] || '';
+                    const variationsRaw = String(rowObj["Variasi"] || rowObj["Variasi Format (Nama:Harga:Stok:Diskon|...)"] || rowObj["variations"] || '').trim();
 
                     let parsedVariations = [];
                     if (variationsRaw && variationsRaw.includes(':')) {
@@ -801,38 +875,43 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                             const [vName, vPrice, vStock, vDisc] = vStr.split(':');
                             return {
                                 name: (vName || '').trim(),
-                                price: parseFloat(vPrice || price),
-                                stock: parseInt(vStock || stock),
-                                discount: parseFloat(vDisc || 0)
+                                price: toIntRupiah(vPrice || price),
+                                stock: parseInt(vStock || stockVal, 10) || 0,
+                                discount: toIntRupiah(vDisc || 0)
                             };
                         }).filter(v => v.name);
                     }
 
-                    const assignedId = rawId ? rawId.trim().toUpperCase() : generateNextId(name, category, [...products, ...previewRows]);
+                    const assignedId = rawId ? rawId.toUpperCase() : generateNextId(name, category, [...products, ...previewRows]);
+                    const existing = existingMap.get(assignedId);
 
                     previewRows.push({
                         id: assignedId,
                         name,
                         category,
                         price: parsedVariations.length > 0 ? Math.min(...parsedVariations.map(v => v.price)) : price,
-                        stock: parsedVariations.length > 0 ? parsedVariations.reduce((s, v) => s + v.stock, 0) : stock,
+                        stock: parsedVariations.length > 0 ? parsedVariations.reduce((s, v) => s + v.stock, 0) : stockVal,
                         discount,
                         tag,
                         hiddenFromCatalogue,
                         variations: parsedVariations,
-                        img: 'assets/mascot.png'
+                        img: existing?.img || 'assets/mascot.png',
+                        _importAction: existing ? 'UPDATE' : 'BARU'
                     });
-                }
+                });
 
                 setImportPreview(previewRows);
                 setImportErrors(errors);
                 setShowImportModal(true);
-            } catch (err) {
-                console.error("CSV parse error:", err);
-                showToast("Format CSV tidak terbaca. Pastikan format valid!", "⚠️");
+            } catch {
+                showToast("Format CSV/XLSX tidak terbaca. Pastikan format valid!", "⚠️");
             }
         };
-        reader.readAsText(file);
+        if (isSpreadsheet) {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsText(file);
+        }
         e.target.value = ''; // Reset input
     };
 
@@ -859,7 +938,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 setImportErrors([]);
                 fetchProducts();
             }
-        } catch (e) {
+        } catch {
             showToast("Gagal melakukan batch import produk", "⚠️");
         }
     };
@@ -876,9 +955,9 @@ export default function Inventory({ showToast, currentUser, userRole }) {
     };
 
     return (
-        <div className="inventory-layout flex flex-col gap-3 lg:grid lg:grid-cols-[1.18fr_1.82fr] lg:gap-6 h-auto overflow-visible pb-12">
-            {/* Mobile View Tab Selector */}
-            <div className="lg:hidden flex border-2 border-text rounded-xl overflow-hidden mb-1 shrink-0 bg-white font-title text-xs font-bold shadow-[2px_2px_0px_#181818] w-full">
+        <div className="inventory-layout flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(320px,0.88fr)_minmax(0,1.7fr)] xl:gap-5 h-auto overflow-visible pb-12">
+            {/* Mobile & Tablet (< xl) View Tab Selector */}
+            <div className="xl:hidden flex border-2 border-text rounded-xl overflow-hidden mb-1 shrink-0 bg-white font-title text-xs font-bold shadow-[2px_2px_0px_#181818] w-full">
                 <button 
                     type="button"
                     onClick={() => setActiveMobileTab('list')}
@@ -900,7 +979,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             </div>
 
             {/* Left Column: Add Product & Manage Category Card */}
-            <div className={`flex flex-col gap-5 h-auto pr-1 ${activeMobileTab === 'manage' ? 'block' : 'hidden lg:flex'}`}>
+            <div className={`min-w-0 flex flex-col gap-5 h-auto ${activeMobileTab === 'manage' ? 'block' : 'hidden xl:flex'}`}>
                 
                 {/* 1. Add Product Card */}
                 <div className="add-product-card bg-yellow-light border-[3px] border-text rounded-2xl shadow-card p-5 relative shrink-0">
@@ -968,6 +1047,49 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                             />
                         </div>
 
+                        {/* Product Image Upload / URL */}
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[12px] font-bold uppercase">Foto Merch (Opsional)</label>
+                            <div className="flex items-center gap-2.5 bg-white border-2 border-text rounded-xl p-2">
+                                <div className="w-12 h-12 rounded-lg border-2 border-text/30 bg-yellow-light/25 flex items-center justify-center overflow-hidden shrink-0">
+                                    {resolveProductImageUrl(productImg) ? (
+                                        <img src={resolveProductImageUrl(productImg)} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <i className="fa-regular fa-image text-text/40 text-lg"></i>
+                                    )}
+                                </div>
+                                <div className="flex flex-col gap-1.5 flex-grow min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <label className="bg-blue-light hover:bg-yellow border border-text rounded-lg px-2.5 py-1 text-[11px] font-title font-bold cursor-pointer">
+                                            {imgCompressing ? 'Memproses...' : 'Upload Foto'}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => handleImageFileSelect(e.target.files?.[0], setProductImg)}
+                                            />
+                                        </label>
+                                        {productImg && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setProductImg('')}
+                                                className="text-[10px] font-bold text-rose-700 hover:underline cursor-pointer"
+                                            >
+                                                Hapus Foto
+                                            </button>
+                                        )}
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Atau tempel URL gambar (https://...)"
+                                        value={productImg.startsWith('data:image/') ? '' : productImg}
+                                        onChange={(e) => setProductImg(e.target.value)}
+                                        className="border border-text/30 rounded-lg px-2 py-1 text-[11px] outline-none bg-yellow-light/15 w-full"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Variations Checkbox */}
                         <div className="flex items-center gap-2 mt-1">
                             <input 
@@ -988,11 +1110,12 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                 <div className="flex flex-col gap-1.5">
                                     <label className="text-[12px] font-bold uppercase">{t.price || "Harga (Rupiah)"}</label>
                                     <input 
-                                        type="number" 
+                                        type="text"
+                                        inputMode="numeric"
                                         required={!hasVariations}
                                         placeholder="Contoh: 45000" 
                                         value={price} 
-                                        onChange={(e) => setPrice(e.target.value)}
+                                        onChange={(e) => setPrice(sanitizeIntegerInput(e.target.value))}
                                         className="border-2 border-text rounded-xl p-2.5 text-sm outline-none focus:bg-white bg-white font-bold"
                                     />
                                 </div>
@@ -1075,22 +1198,23 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                             <div className="flex-grow flex flex-col gap-0.5">
                                                 <label className="text-[10px] font-bold uppercase text-text/80">Harga Semua Opsi (Rp)</label>
                                                 <input 
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="numeric"
                                                     required={hasVariations && uniformVariantPrice}
                                                     placeholder="Contoh: 7000"
                                                     value={masterVariantPrice}
-                                                    onChange={(e) => setMasterVariantPrice(e.target.value)}
+                                                    onChange={(e) => setMasterVariantPrice(sanitizeIntegerInput(e.target.value))}
                                                     className="border-2 border-text rounded-lg p-1 text-xs outline-none bg-white font-title font-bold"
                                                 />
                                             </div>
                                             <div className="w-[110px] flex flex-col gap-0.5">
                                                 <label className="text-[10px] font-bold uppercase text-pink">Diskon (Rp)</label>
                                                 <input 
-                                                    type="number"
-                                                    min="0"
+                                                    type="text"
+                                                    inputMode="numeric"
                                                     placeholder="0"
                                                     value={masterVariantDiscount}
-                                                    onChange={(e) => setMasterVariantDiscount(e.target.value)}
+                                                    onChange={(e) => setMasterVariantDiscount(sanitizeIntegerInput(e.target.value))}
                                                     className="border-2 border-pink/50 rounded-lg p-1 text-xs outline-none bg-white font-bold"
                                                 />
                                             </div>
@@ -1116,11 +1240,12 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                 {!uniformVariantPrice && (
                                                     <div className="flex flex-col gap-1 w-[95px] sm:w-[110px]">
                                                         <input 
-                                                            type="number" 
+                                                            type="text"
+                                                            inputMode="numeric"
                                                             placeholder="Harga" 
                                                             required={hasVariations && !uniformVariantPrice}
                                                             value={row.price}
-                                                            onChange={(e) => handleVariationRowChange(idx, 'price', e.target.value)}
+                                                            onChange={(e) => handleVariationRowChange(idx, 'price', sanitizeIntegerInput(e.target.value))}
                                                             className="border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-title font-bold"
                                                         />
                                                     </div>
@@ -1153,15 +1278,15 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                 <div className="flex items-center gap-1.5 pl-0.5">
                                                     <i className="fa-solid fa-tag text-[9px] text-pink"></i>
                                                     <input 
-                                                        type="number" 
+                                                        type="text"
+                                                        inputMode="numeric"
                                                         placeholder="Diskon (Rp)" 
-                                                        min="0"
                                                         value={row.discount}
-                                                        onChange={(e) => handleVariationRowChange(idx, 'discount', e.target.value)}
+                                                        onChange={(e) => handleVariationRowChange(idx, 'discount', sanitizeIntegerInput(e.target.value))}
                                                         className="border-2 border-pink/40 rounded-lg p-0.5 text-[10px] outline-none bg-pink-light/15 font-bold w-[90px] focus:border-pink"
                                                     />
-                                                    {parseFloat(row.discount || 0) > 0 && parseFloat(row.price || 0) > 0 && (
-                                                        <span className="text-[9px] text-pink font-bold">→ {formatPrice(Math.max(0, parseFloat(row.price) - parseFloat(row.discount)))}</span>
+                                                    {toIntRupiah(row.discount) > 0 && toIntRupiah(row.price) > 0 && (
+                                                        <span className="text-[9px] text-pink font-bold">→ {formatPrice(Math.max(0, toIntRupiah(row.price) - toIntRupiah(row.discount)))}</span>
                                                     )}
                                                 </div>
                                             )}
@@ -1250,7 +1375,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
             </div>
 
             {/* Right Column: Inventory List Card (Retro OS Window) */}
-            <div className={`inventory-card bg-white border-[3px] border-text rounded-2xl shadow-pop overflow-hidden flex flex-col h-auto relative ${activeMobileTab === 'list' ? 'block' : 'hidden lg:flex'}`}>
+            <div className={`inventory-card min-w-0 bg-white border-[3px] border-text rounded-2xl shadow-pop overflow-hidden flex flex-col h-auto relative ${activeMobileTab === 'list' ? 'block' : 'hidden xl:flex'}`}>
                 <div className="retro-window-header bg-blue border-b-[2.5px] border-text px-3.5 py-2 flex items-center justify-between">
                     <div className="retro-dots flex items-center gap-1.5">
                         <span className="retro-dot retro-dot-red"></span>
@@ -1268,20 +1393,29 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                         <span>{t.inventory || "Stok Barang"}</span>
                     </h3>
 
-                    {/* Quick Action Toolbar: CSV Import, XLSX Template, Empty Slot */}
+                    {/* Quick Action Toolbar: CSV/XLSX Import, Export Stok, Template, Empty Slot */}
                     <div className="flex flex-wrap items-center gap-2">
                         <label 
                             className="btn bg-pink text-text border-2 border-text rounded-full px-3 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center gap-1.5 cursor-pointer"
-                            title="Import produk via file CSV"
+                            title="Import produk via file CSV atau XLSX"
                         >
-                            <i className="fa-solid fa-file-csv"></i> Import CSV
+                            <i className="fa-solid fa-file-import"></i> Import CSV/XLSX
                             <input 
                                 type="file" 
-                                accept=".csv" 
+                                accept=".csv,.xlsx,.xls" 
                                 onChange={handleCsvFileUpload} 
                                 className="hidden" 
                             />
                         </label>
+
+                        <button 
+                            type="button"
+                            onClick={handleExportStockXlsx}
+                            className="btn bg-emerald-100 text-emerald-900 border-2 border-text rounded-full px-3 py-1.5 text-xs font-title font-bold shadow-[2px_2px_0px_#181818] hover:bg-white hover:translate-y-[-1px] active:translate-y-[1px] transition-all flex items-center gap-1.5 cursor-pointer"
+                            title="Export seluruh stok saat ini ke .xlsx"
+                        >
+                            <i className="fa-solid fa-file-export"></i> Export Stok
+                        </button>
 
                         <button 
                             type="button"
@@ -1307,7 +1441,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 <div className="bg-yellow-light/30 border-2 border-text rounded-xl p-3 mb-3.5 flex flex-col gap-2.5 shrink-0 shadow-[2px_2px_0px_#181818]">
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                         {/* Search Input */}
-                        <div className="sm:col-span-5 relative flex items-center">
+                        <div className="sm:col-span-4 relative flex items-center">
                             <i className="fa-solid fa-magnifying-glass absolute left-3 text-text/60 text-xs"></i>
                             <input 
                                 type="text"
@@ -1327,7 +1461,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                         </div>
 
                         {/* Category Filter */}
-                        <div className="sm:col-span-3">
+                        <div className="sm:col-span-4">
                             <select 
                                 value={filterCategory}
                                 onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }}
@@ -1359,7 +1493,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-dashed border-text/15 text-xs">
                         {/* Visibility Pill Filters */}
-                        <div className="flex items-center gap-1.5 font-tag font-bold">
+                        <div className="flex flex-wrap items-center gap-1.5 font-tag font-bold">
                             <span className="text-[10px] text-text/60 uppercase mr-1">Visibilitas:</span>
                             <button
                                 onClick={() => { setFilterVisibility('all'); setCurrentPage(1); }}
@@ -1384,6 +1518,32 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                 }`}
                             >
                                 Hidden
+                            </button>
+
+                            <span className="text-[10px] text-text/60 uppercase ml-2 mr-1">Kesehatan Stok:</span>
+                            <button
+                                onClick={() => { setFilterStockHealth('all'); setCurrentPage(1); }}
+                                className={`px-2.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-all ${
+                                    filterStockHealth === 'all' ? 'bg-blue-light text-text border-text font-black shadow-[1px_1px_0px_#181818]' : 'bg-white text-text/70 border-text/30 hover:border-text'
+                                }`}
+                            >
+                                Semua ({products.length})
+                            </button>
+                            <button
+                                onClick={() => { setFilterStockHealth('low'); setCurrentPage(1); }}
+                                className={`px-2.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-all ${
+                                    filterStockHealth === 'low' ? 'bg-yellow text-text border-text font-black shadow-[1px_1px_0px_#181818]' : 'bg-white text-amber-800 border-amber-400 hover:border-text'
+                                }`}
+                            >
+                                Tipis ({stockSummary.lowCount})
+                            </button>
+                            <button
+                                onClick={() => { setFilterStockHealth('out'); setCurrentPage(1); }}
+                                className={`px-2.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-all ${
+                                    filterStockHealth === 'out' ? 'bg-rose-200 text-rose-950 border-text font-black shadow-[1px_1px_0px_#181818]' : 'bg-white text-rose-700 border-rose-400 hover:border-text'
+                                }`}
+                            >
+                                Habis ({stockSummary.outCount})
                             </button>
                         </div>
 
@@ -1426,49 +1586,55 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                     </div>
                 )}
 
-                <div className="table-container flex-grow overflow-y-auto max-h-[720px] pb-10 pr-0.5">
+                <div className="table-container flex-grow pb-4">
                     {loading ? (
                         <div className="text-center py-12 font-bold text-text/60">{t.loadingProducts}</div>
                     ) : (
                         <>
-                            {/* 1. Mobile Card List (< lg) */}
-                            <div className="block lg:hidden space-y-3">
-                                {paginatedProducts.map(prod => (
-                                    <ProductCardMobile
-                                        key={prod.id}
-                                        product={prod}
-                                        selected={selectedProducts.includes(prod.id)}
-                                        onSelect={(checked) => {
-                                            if (checked) {
-                                                setSelectedProducts(prev => [...prev, prod.id]);
-                                            } else {
-                                                setSelectedProducts(prev => prev.filter(id => id !== prod.id));
-                                            }
-                                        }}
-                                        onRestock={(varName) => handleRestockClick(prod, varName)}
-                                        onEdit={() => handleOpenEditModal(prod)}
-                                        onDelete={() => handleDelete(prod.id)}
-                                        onToggleVisibility={() => handleToggleCatalogueVisibility(prod)}
-                                        expanded={expandedProductId === prod.id}
-                                        onToggleExpand={() => setExpandedProductId(expandedProductId === prod.id ? null : prod.id)}
-                                        formatPrice={formatPrice}
-                                        getCategoryDisplayLabel={getCategoryDisplayLabel}
-                                    />
-                                ))}
+                            {/* 1. Mobile Card List (< md) */}
+                            <div className="block md:hidden space-y-3">
+                                {paginatedProducts.length === 0 ? (
+                                    <div className="border-2 border-dashed border-text/30 rounded-xl p-8 text-center text-text/60 text-xs font-bold bg-yellow-light/20">
+                                        {products.length === 0 ? 'Belum ada produk di katalog stok.' : 'Tidak ada produk yang cocok dengan filter.'}
+                                    </div>
+                                ) : (
+                                    paginatedProducts.map(prod => (
+                                        <ProductCardMobile
+                                            key={prod.id}
+                                            product={prod}
+                                            selected={selectedProducts.includes(prod.id)}
+                                            onSelect={(checked) => {
+                                                if (checked) {
+                                                    setSelectedProducts(prev => [...prev, prod.id]);
+                                                } else {
+                                                    setSelectedProducts(prev => prev.filter(id => id !== prod.id));
+                                                }
+                                            }}
+                                            onRestock={(varName) => handleRestockClick(prod, varName)}
+                                            onEdit={() => handleOpenEditModal(prod)}
+                                            onDelete={() => handleDelete(prod.id)}
+                                            onToggleVisibility={() => handleToggleCatalogueVisibility(prod)}
+                                            expanded={expandedProductId === prod.id}
+                                            onToggleExpand={() => setExpandedProductId(expandedProductId === prod.id ? null : prod.id)}
+                                            formatPrice={formatPrice}
+                                            getCategoryDisplayLabel={getCategoryDisplayLabel}
+                                        />
+                                    ))
+                                )}
                             </div>
 
-                            {/* 2. Desktop Table (>= lg) */}
-                            <div className="hidden lg:block border-2 border-text rounded-lg overflow-x-auto">
-                                <table className="history-table w-full border-collapse text-left text-[13px] text-text">
-                            <thead>
+                            {/* 2. Desktop & Tablet Table (>= md) */}
+                            <div className="hidden md:block border-2 border-text rounded-xl overflow-x-auto overflow-y-auto max-h-[680px] bg-white">
+                                <table className="history-table w-full min-w-[640px] border-collapse text-left text-[13px] text-text">
+                            <thead className="sticky top-0 z-10">
                                 <tr className="bg-blue-light border-b-2 border-text font-title font-bold">
-                                    <th className="p-3 w-10 text-center">
+                                    <th className="p-2.5 w-10 text-center">
                                         <input 
                                             type="checkbox" 
-                                            checked={products.length > 0 && selectedProducts.length === products.length} 
+                                            checked={processedProducts.length > 0 && processedProducts.every(p => selectedProducts.includes(p.id))} 
                                             onChange={(e) => {
                                                 if (e.target.checked) {
-                                                    setSelectedProducts(products.map(p => p.id));
+                                                    setSelectedProducts(processedProducts.map(p => p.id));
                                                 } else {
                                                     setSelectedProducts([]);
                                                 }
@@ -1476,26 +1642,41 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                             className="w-4 h-4 cursor-pointer accent-pink"
                                         />
                                     </th>
-                                    <th className="p-3">{t.code || "Kode"}</th>
-                                    <th className="p-3">{t.name || "Nama"}</th>
-                                    <th className="p-3">{t.price || "Harga"}</th>
-                                    <th className="p-3">{t.stock || "Stok"}</th>
-                                    <th className="p-3 text-center">{t.actions || "Aksi"}</th>
+                                    <th className="p-2.5 w-[135px] whitespace-nowrap">{t.code || "Kode"}</th>
+                                    <th className="p-2.5 min-w-[180px]">{t.name || "Nama"}</th>
+                                    <th className="p-2.5 w-[105px] whitespace-nowrap">{t.price || "Harga"}</th>
+                                    <th className="p-2.5 w-[85px] whitespace-nowrap">{t.stock || "Stok"}</th>
+                                    <th className="p-2.5 w-[195px] text-center whitespace-nowrap">{t.actions || "Aksi"}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedProducts.map(prod => {
+                                {paginatedProducts.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="6" className="p-10 text-center text-text/60 bg-yellow-light/15">
+                                            <div className="flex flex-col items-center gap-1.5">
+                                                <i className="fa-solid fa-box-open text-2xl text-text/35"></i>
+                                                <span className="font-title font-bold text-sm text-text/75">
+                                                    {products.length === 0 ? 'Belum ada produk di stok barang' : 'Tidak ada produk yang cocok dengan filter'}
+                                                </span>
+                                                <span className="text-[11px] text-text/55">
+                                                    {products.length === 0 ? 'Tambahkan produk lewat panel kiri atau import CSV/XLSX.' : 'Coba ubah kata kunci pencarian atau filter di atas.'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                paginatedProducts.map(prod => {
                                     const isLowStock = prod.stock <= 5;
                                     const hasVars = prod.variations && prod.variations.length > 0;
                                     const isExpanded = expandedProductId === prod.id;
 
                                     return (
-                                        <React.Fragment key={prod.id}>
+                                        <Fragment key={prod.id}>
                                             <tr className={`hover:bg-yellow-light border-b border-text/15 ${isLowStock ? 'bg-pink-light/30' : ''} ${hasVars ? 'cursor-pointer' : ''}`}
                                                 onClick={() => hasVars && setExpandedProductId(isExpanded ? null : prod.id)}
                                             >
                                                 {/* Select Checkbox */}
-                                                <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <td className="p-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                     <input 
                                                         type="checkbox" 
                                                         checked={selectedProducts.includes(prod.id)} 
@@ -1509,23 +1690,40 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         className="w-4 h-4 cursor-pointer accent-pink"
                                                     />
                                                 </td>
-                                                <td className="p-3 font-bold text-[11px] whitespace-nowrap">
+                                                <td className="p-2.5 font-bold text-[11px] whitespace-nowrap">
                                                     {prod.id}
                                                     {prod.tag && (
-                                                        <span className="block text-[9px] font-normal opacity-70">
+                                                        <span className="block text-[9px] font-normal opacity-70 truncate max-w-[120px]">
                                                             Tag: {prod.tag}
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="p-3 font-bold flex flex-col gap-0.5">
-                                                    <span>{prod.name}</span>
-                                                    {hasVars && (
-                                                        <span className="text-[10px] text-blue font-title">
-                                                            {isExpanded ? "▼ Sembunyikan Variasi" : `▶ Lihat ${prod.variations.length} Variasi`}
-                                                        </span>
-                                                    )}
+                                                <td className="p-2.5 font-bold">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        {resolveProductImageUrl(prod.img) ? (
+                                                            <img
+                                                                src={resolveProductImageUrl(prod.img)}
+                                                                alt={prod.name}
+                                                                loading="lazy"
+                                                                decoding="async"
+                                                                className="w-9 h-9 rounded-lg border border-text object-cover shrink-0 bg-white"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-9 h-9 rounded-lg border border-dashed border-text/30 bg-yellow-light/20 flex items-center justify-center shrink-0 text-text/35">
+                                                                <i className="fa-regular fa-image text-xs"></i>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex flex-col gap-0.5 min-w-0">
+                                                            <span className="truncate">{prod.name}</span>
+                                                            {hasVars && (
+                                                                <span className="text-[10px] text-blue font-title">
+                                                                    {isExpanded ? "▼ Sembunyikan Variasi" : `▶ Lihat ${prod.variations.length} Variasi`}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </td>
-                                                <td className="p-3 font-title text-[12px] font-bold text-text">
+                                                <td className="p-2.5 font-title text-[12px] font-bold text-text whitespace-nowrap">
                                                     {(prod.discount || 0) > 0 && !hasVars ? (
                                                         <div className="flex flex-col">
                                                             <span className="line-through opacity-50 text-[10px]">{formatPrice(prod.price)}</span>
@@ -1539,20 +1737,20 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         </>
                                                     )}
                                                 </td>
-                                                <td className="p-3 font-bold">
+                                                <td className="p-2.5 font-bold whitespace-nowrap">
                                                     <span className={`px-2 py-0.5 rounded-full border ${
                                                         isLowStock ? 'bg-pink border-text text-text text-[10px]' : 'bg-transparent border-transparent'
                                                     }`}>
                                                         {prod.stock} {isLowStock && `! ${t.lowStock || 'Tipis!'}`}
                                                     </span>
                                                 </td>
-                                                <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                                                    <div className="flex justify-center gap-2">
+                                                <td className="p-2.5" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex justify-center items-center gap-1.5 whitespace-nowrap">
                                                         {/* Hide from Catalogue Toggle */}
                                                         <button 
                                                             onClick={() => handleToggleCatalogueVisibility(prod)}
                                                             title={prod.hiddenFromCatalogue ? "Tampilkan di katalog POS" : "Sembunyikan dari katalog POS"}
-                                                            className={`btn border-2 border-text rounded-full font-title text-[10px] px-2.5 py-1 cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1 ${
+                                                            className={`btn border-2 border-text rounded-full font-title text-[10px] px-2 py-1 cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1 ${
                                                                 prod.hiddenFromCatalogue ? 'bg-pink text-text hover:bg-white' : 'bg-white text-text hover:bg-yellow-light'
                                                             }`}
                                                         >
@@ -1564,10 +1762,10 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         {!hasVars && (
                                                             <button 
                                                                 onClick={() => handleRestockClick(prod)}
-                                                                title="Isi stok barang"
-                                                                className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
+                                                                title="Isi / sesuaikan stok barang"
+                                                                className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-[10px] px-2.5 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                             >
-                                                                <i className="fa-solid fa-box-open"></i> {t.restock || "Isi Stok"}
+                                                                <i className="fa-solid fa-box-open"></i> Stok
                                                             </button>
                                                         )}
 
@@ -1575,7 +1773,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         <button 
                                                             onClick={() => handleOpenEditModal(prod)}
                                                             title="Edit produk"
-                                                            className="btn bg-blue-light text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
+                                                            className="btn bg-blue-light text-text border-2 border-text rounded-full font-title text-[10px] px-2.5 py-1 hover:bg-white cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                         >
                                                             <i className="fa-solid fa-pen-to-square"></i> Edit
                                                         </button>
@@ -1584,7 +1782,7 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                         <button 
                                                             onClick={() => handleDelete(prod.id)}
                                                             title="Hapus produk"
-                                                            className="btn bg-white text-text border-2 border-text rounded-full font-title text-[10px] px-3 py-1 hover:bg-pink-light cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1 text-pink"
+                                                            className="btn bg-white text-pink border-2 border-text rounded-full font-title text-[10px] px-2 py-1 hover:bg-pink-light cursor-pointer shadow-[1px_1px_0px_#181818] transition-all flex items-center gap-1"
                                                         >
                                                             <i className="fa-solid fa-trash-can"></i>
                                                         </button>
@@ -1637,9 +1835,10 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                     </td>
                                                 </tr>
                                             )}
-                                        </React.Fragment>
+                                        </Fragment>
                                     );
-                                })}
+                                })
+                                )}
                             </tbody>
                         </table>
                             </div>
@@ -1647,17 +1846,17 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                             {/* Pagination Controls Bar */}
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t-2 border-text/10 shrink-0 font-body text-xs">
                                 <span className="text-text/70">
-                                    Menampilkan <strong>{processedProducts.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> - <strong>{Math.min(currentPage * pageSize, processedProducts.length)}</strong> dari <strong>{processedProducts.length}</strong> produk
+                                    Menampilkan <strong>{processedProducts.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1}</strong> - <strong>{Math.min(safeCurrentPage * pageSize, processedProducts.length)}</strong> dari <strong>{processedProducts.length}</strong> produk
                                 </span>
 
                                 <div className="flex items-center gap-1.5 font-tag font-bold">
                                     <button
                                         type="button"
-                                        disabled={currentPage <= 1}
+                                        disabled={safeCurrentPage <= 1}
                                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                         className={`px-3 py-1.5 rounded-lg border-2 border-text transition-all ${
-                                            currentPage <= 1 
-                                                ? 'bg-gray-100 text-gray-400 border-gray-300 opacity-60 cursor-not-allowed' 
+                                            safeCurrentPage <= 1 
+                                                ? 'bg-gray-100 text-gray-500 border-gray-400 opacity-75 cursor-not-allowed' 
                                                 : 'bg-white text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] cursor-pointer'
                                         }`}
                                     >
@@ -1665,16 +1864,16 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                     </button>
 
                                     <span className="bg-yellow-light border border-text px-3 py-1.5 rounded-lg font-bold">
-                                        Hal {currentPage} / {totalPages}
+                                        Hal {safeCurrentPage} / {totalPages}
                                     </span>
 
                                     <button
                                         type="button"
-                                        disabled={currentPage >= totalPages}
+                                        disabled={safeCurrentPage >= totalPages}
                                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                         className={`px-3 py-1.5 rounded-lg border-2 border-text transition-all ${
-                                            currentPage >= totalPages 
-                                                ? 'bg-gray-100 text-gray-400 border-gray-300 opacity-60 cursor-not-allowed' 
+                                            safeCurrentPage >= totalPages 
+                                                ? 'bg-gray-100 text-gray-500 border-gray-400 opacity-75 cursor-not-allowed' 
                                                 : 'bg-white text-text hover:bg-yellow shadow-[1.5px_1.5px_0px_#181818] active:translate-y-[1px] cursor-pointer'
                                         }`}
                                     >
@@ -1688,14 +1887,14 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                 </div>
             </div>
 
-            {/* Custom Restock Modal overlay */}
+            {/* Custom Unified Stock Adjust Modal overlay (Add / Subtract / Opname) */}
             {restockTarget && (
                 <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4 animate-[fade_0.2s_ease]">
-                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[340px] overflow-hidden flex flex-col p-5 text-text relative">
+                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[94vw] max-w-[380px] overflow-hidden flex flex-col p-5 text-text relative">
                         <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
                         
-                        <div className="w-full flex justify-between items-center border-b border-text/10 pb-2.5 mb-4 border-dashed">
-                            <span className="font-title text-base font-bold text-center w-full">Isi Stok Barang</span>
+                        <div className="w-full flex justify-between items-center border-b border-text/10 pb-2.5 mb-3 border-dashed">
+                            <span className="font-title text-base font-bold text-center w-full">Kelola Stok Barang</span>
                             <button 
                                 onClick={() => setRestockTarget(null)}
                                 className="absolute right-4 text-text hover:text-pink transition-transform hover:scale-110 cursor-pointer"
@@ -1704,29 +1903,88 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                             </button>
                         </div>
                         
-                        <div className="text-center mb-4">
+                        <div className="text-center mb-3">
                             <h4 className="font-title text-sm font-bold text-text mb-1">{restockTarget.product.name}</h4>
-                            {restockTarget.variationName && (
-                                <span className="bg-blue-light border border-text/25 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                                    Variasi: {restockTarget.variationName}
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                {restockTarget.variationName && (
+                                    <span className="bg-blue-light border border-text/25 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                                        Variasi: {restockTarget.variationName}
+                                    </span>
+                                )}
+                                <span className="bg-yellow-light border border-text/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                                    Stok Saat Ini: {
+                                        restockTarget.variationName
+                                            ? (restockTarget.product.variations?.find(v => v.name === restockTarget.variationName)?.stock || 0)
+                                            : (restockTarget.product.stock || 0)
+                                    } pcs
                                 </span>
-                            )}
+                            </div>
                         </div>
 
-                        <form onSubmit={handleRestockSubmit} className="w-full flex flex-col gap-4">
+                        {/* Mode Selector Tabs */}
+                        <div className="grid grid-cols-3 gap-1.5 p-1 bg-yellow-light/40 border-2 border-text rounded-xl mb-3 font-tag text-[10px] font-extrabold">
+                            {[
+                                { id: 'add', label: '+ Tambah' },
+                                { id: 'sub', label: '- Kurangi' },
+                                { id: 'set', label: '= Set Opname' }
+                            ].map(m => (
+                                <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => {
+                                        setStockAdjustMode(m.id);
+                                        setStockAdjustReason(m.id === 'add' ? 'Restok' : m.id === 'sub' ? 'Rusak / Freebie' : 'Stock Opname');
+                                    }}
+                                    className={`py-1.5 rounded-lg border cursor-pointer transition-all ${
+                                        stockAdjustMode === m.id
+                                            ? 'bg-yellow text-text border-text shadow-[1px_1px_0px_#181818]'
+                                            : 'bg-white text-text/70 border-transparent hover:text-text'
+                                    }`}
+                                >
+                                    {m.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <form onSubmit={handleRestockSubmit} className="w-full flex flex-col gap-3">
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-[11px] font-bold uppercase text-text/80">Jumlah Tambahan Stok</label>
+                                <label className="text-[11px] font-bold uppercase text-text/80">
+                                    {stockAdjustMode === 'add' ? 'Jumlah Tambahan (+)' : stockAdjustMode === 'sub' ? 'Jumlah Pengurangan (-)' : 'Set Stok Akhir (=)'}
+                                </label>
                                 <input 
                                     type="number" 
                                     required
-                                    min="1"
+                                    min={stockAdjustMode === 'set' ? '0' : '1'}
                                     value={restockAmount}
                                     onChange={(e) => setRestockAmount(e.target.value)}
-                                    className="border-2 border-text rounded-xl p-2 text-sm outline-none bg-white font-bold text-center text-lg focus:bg-yellow-light"
+                                    className="border-2 border-text rounded-xl p-2 outline-none bg-white font-bold text-center text-lg focus:bg-yellow-light"
+                                />
+                                <div className="flex justify-center gap-1.5 flex-wrap">
+                                    {(stockAdjustMode === 'set' ? [0, 5, 10, 25, 50] : [1, 5, 10, 25, 50]).map(preset => (
+                                        <button
+                                            key={preset}
+                                            type="button"
+                                            onClick={() => setRestockAmount(String(preset))}
+                                            className="text-[10px] font-tag font-bold bg-blue-light/50 hover:bg-yellow border border-text rounded-lg px-2.5 py-0.5 cursor-pointer"
+                                        >
+                                            {stockAdjustMode === 'set' ? `=${preset}` : stockAdjustMode === 'sub' ? `-${preset}` : `+${preset}`}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10.5px] font-bold uppercase text-text/70">Catatan / Alasan (Tercatat di Audit)</label>
+                                <input
+                                    type="text"
+                                    value={stockAdjustReason}
+                                    onChange={(e) => setStockAdjustReason(e.target.value)}
+                                    placeholder="Restok / Opname / Freebie / Rusak"
+                                    className="border-2 border-text rounded-xl px-3 py-1.5 text-xs outline-none bg-white font-medium focus:bg-yellow-light/20"
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 mt-1.5">
+                            <div className="grid grid-cols-2 gap-3 mt-1">
                                 <button 
                                     type="button"
                                     onClick={() => setRestockTarget(null)}
@@ -1816,6 +2074,49 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                         </div>
                                     </div>
 
+                                    {/* Edit Image Upload / URL */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[11px] font-bold uppercase text-text/80">Foto Merch (Opsional)</label>
+                                        <div className="flex items-center gap-2.5 bg-yellow-light/15 border-2 border-text/30 rounded-xl p-2">
+                                            <div className="w-12 h-12 rounded-lg border-2 border-text/30 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                                                {resolveProductImageUrl(editingProduct.img) ? (
+                                                    <img src={resolveProductImageUrl(editingProduct.img)} alt={editingProduct.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <i className="fa-regular fa-image text-text/40 text-lg"></i>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col gap-1 flex-grow min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <label className="bg-blue-light hover:bg-yellow border border-text rounded-lg px-2.5 py-0.5 text-[10.5px] font-title font-bold cursor-pointer">
+                                                        {imgCompressing ? 'Memproses...' : (resolveProductImageUrl(editingProduct.img) ? 'Ganti Foto' : 'Upload Foto')}
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={(e) => handleImageFileSelect(e.target.files?.[0], (url) => setEditingProduct(prev => ({ ...prev, img: url })))}
+                                                        />
+                                                    </label>
+                                                    {resolveProductImageUrl(editingProduct.img) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingProduct(prev => ({ ...prev, img: '' }))}
+                                                            className="text-[10px] font-bold text-rose-700 hover:underline cursor-pointer"
+                                                        >
+                                                            Hapus Foto
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Atau tempel URL gambar (https://...)"
+                                                    value={(editingProduct.img || '').startsWith('data:image/') || editingProduct.img === 'assets/mascot.png' ? '' : (editingProduct.img || '')}
+                                                    onChange={(e) => setEditingProduct(prev => ({ ...prev, img: e.target.value }))}
+                                                    className="border border-text/30 rounded-lg px-2 py-1 text-[11px] outline-none bg-white w-full"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Hide from Catalogue Toggle */}
                                     <div className="flex items-center gap-2 py-1 bg-yellow-light/30 border border-text/15 rounded-xl px-3 mt-1">
                                         <input 
@@ -1859,10 +2160,11 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                 <div className="flex flex-col gap-1">
                                                     <label className="text-[10px] font-bold uppercase text-text/80">Harga (Rp)</label>
                                                     <input 
-                                                        type="number" 
+                                                        type="text"
+                                                        inputMode="numeric"
                                                         required={!editingProduct.hasVariations}
                                                         value={editingProduct.price}
-                                                        onChange={(e) => setEditingProduct(prev => ({ ...prev, price: e.target.value }))}
+                                                        onChange={(e) => setEditingProduct(prev => ({ ...prev, price: sanitizeIntegerInput(e.target.value) }))}
                                                         className="border-2 border-text rounded-xl p-2 text-xs outline-none bg-white font-bold"
                                                     />
                                                 </div>
@@ -1892,10 +2194,11 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                             <div className="flex flex-col gap-1">
                                                 <label className="text-[10px] font-bold uppercase text-pink">Diskon per Item (Rp)</label>
                                                 <input 
-                                                    type="number" 
-                                                    min="0"
+                                                    type="text"
+                                                    inputMode="numeric"
                                                     value={editingProduct.discount}
-                                                    onChange={(e) => setEditingProduct(prev => ({ ...prev, discount: e.target.value }))}
+                                                    onChange={(e) => setEditingProduct(prev => ({ ...prev, discount: sanitizeIntegerInput(e.target.value) }))}
+                                                    placeholder="0"
                                                     className="border-2 border-pink/60 rounded-xl p-2 text-xs outline-none bg-white font-bold"
                                                 />
                                             </div>
@@ -1969,22 +2272,23 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                     <div className="flex-grow flex flex-col gap-0.5">
                                                         <label className="text-[10px] font-bold uppercase text-text/80">Harga Semua Opsi (Rp)</label>
                                                         <input 
-                                                            type="number"
+                                                            type="text"
+                                                            inputMode="numeric"
                                                             required={editingProduct.hasVariations && editingProduct.uniformVariantPrice}
                                                             placeholder="Contoh: 7000"
                                                             value={editingProduct.masterVariantPrice}
-                                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, masterVariantPrice: e.target.value }))}
+                                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, masterVariantPrice: sanitizeIntegerInput(e.target.value) }))}
                                                             className="border-2 border-text rounded-lg p-1 text-xs outline-none bg-white font-title font-bold"
                                                         />
                                                     </div>
                                                     <div className="w-[110px] flex flex-col gap-0.5">
                                                         <label className="text-[10px] font-bold uppercase text-pink">Diskon (Rp)</label>
                                                         <input 
-                                                            type="number"
-                                                            min="0"
+                                                            type="text"
+                                                            inputMode="numeric"
                                                             placeholder="0"
                                                             value={editingProduct.masterVariantDiscount}
-                                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, masterVariantDiscount: e.target.value }))}
+                                                            onChange={(e) => setEditingProduct(prev => ({ ...prev, masterVariantDiscount: sanitizeIntegerInput(e.target.value) }))}
                                                             className="border-2 border-pink/50 rounded-lg p-1 text-xs outline-none bg-white font-bold"
                                                         />
                                                     </div>
@@ -2011,10 +2315,11 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                                 <div className="w-[110px]">
                                                                     <label className="text-[9px] font-bold uppercase text-text/60 block mb-0.5">Harga (Rp)</label>
                                                                     <input 
-                                                                        type="number" 
+                                                                        type="text"
+                                                                        inputMode="numeric"
                                                                         required={editingProduct.hasVariations && !editingProduct.uniformVariantPrice}
                                                                         value={row.price}
-                                                                        onChange={(e) => handleEditVariationRowChange(idx, 'price', e.target.value)}
+                                                                        onChange={(e) => handleEditVariationRowChange(idx, 'price', sanitizeIntegerInput(e.target.value))}
                                                                         className="w-full border-2 border-text rounded-lg p-1.5 text-xs outline-none bg-white font-title font-bold"
                                                                     />
                                                                 </div>
@@ -2047,16 +2352,16 @@ export default function Inventory({ showToast, currentUser, userRole }) {
                                                             <div className="flex items-center gap-2 border-t border-dashed border-text/15 pt-1.5 text-xs">
                                                                 <i className="fa-solid fa-tag text-[10px] text-pink"></i>
                                                                 <input 
-                                                                    type="number" 
+                                                                    type="text"
+                                                                    inputMode="numeric"
                                                                     placeholder="Diskon khusus (Rp)" 
-                                                                    min="0"
                                                                     value={row.discount}
-                                                                    onChange={(e) => handleEditVariationRowChange(idx, 'discount', e.target.value)}
+                                                                    onChange={(e) => handleEditVariationRowChange(idx, 'discount', sanitizeIntegerInput(e.target.value))}
                                                                     className="border border-pink/40 rounded-md p-1 text-[11px] outline-none bg-pink-light/15 font-bold w-[120px]"
                                                                 />
-                                                                {parseFloat(row.discount || 0) > 0 && parseFloat(row.price || 0) > 0 && (
+                                                                {toIntRupiah(row.discount) > 0 && toIntRupiah(row.price) > 0 && (
                                                                     <span className="text-[11px] text-pink font-bold">
-                                                                        → {formatPrice(Math.max(0, parseFloat(row.price) - parseFloat(row.discount)))}
+                                                                        → {formatPrice(Math.max(0, toIntRupiah(row.price) - toIntRupiah(row.discount)))}
                                                                     </span>
                                                                 )}
                                                             </div>

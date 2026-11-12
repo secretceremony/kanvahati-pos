@@ -11,6 +11,7 @@ const Rekapan = React.lazy(() => import('./pages/Rekapan'));
 const HostConsole = React.lazy(() => import('./arcade/pages/HostConsole'));
 const VisitorDisplay = React.lazy(() => import('./arcade/pages/VisitorDisplay'));
 const QuestionBankManager = React.lazy(() => import('./arcade/pages/QuestionBankManager'));
+const ReactionBattle = React.lazy(() => import('./arcade/pages/ReactionBattle'));
 const SuperAdminHub = React.lazy(() => import('./pages/SuperAdminHub'));
 
 import Login from './pages/Login';
@@ -27,11 +28,8 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
 
     // Dropdown state for Laporan & Data
     const isReportPath = ['/riwayat', '/statistik', '/rekapan'].includes(currentPath);
-    const [reportsOpen, setReportsOpen] = useState(isReportPath);
-
-    useEffect(() => {
-        if (isReportPath) setReportsOpen(true);
-    }, [currentPath]);
+    const [reportsToggled, setReportsToggled] = useState(false);
+    const reportsOpen = isReportPath || reportsToggled;
 
     const linkStyle = (path, matchPrefix = false) => {
         const isActive = matchPrefix ? currentPath.startsWith(path) : currentPath === path;
@@ -116,7 +114,7 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                             <div className="space-y-1">
                                 <button
                                     type="button"
-                                    onClick={() => setReportsOpen(prev => !prev)}
+                                    onClick={() => setReportsToggled(prev => !prev)}
                                     className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
                                         isReportPath
                                             ? 'bg-yellow-light/60 border-text text-text'
@@ -167,6 +165,18 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                                     >
                                         <i className="fa-solid fa-gamepad w-4 text-center"></i>
                                         <span>Host Console</span>
+                                    </Link>
+                                    <Link 
+                                        to="/arcade/reaction" 
+                                        onClick={onClose} 
+                                        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl font-title text-[13px] font-bold border-2 transition-all cursor-pointer ${
+                                            currentPath === '/arcade/reaction'
+                                                ? 'bg-pink text-text border-text shadow-[2px_2px_0px_#181818] translate-x-1'
+                                                : 'bg-white/80 text-text/80 border-transparent hover:bg-pink-light hover:border-text hover:text-text'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-bolt w-4 text-center"></i>
+                                        <span>Reaction Battle</span>
                                     </Link>
                                     <Link 
                                         to="/arcade/questions" 
@@ -248,7 +258,11 @@ function MainRoutes({
     showToast
 }) {
     const location = useLocation();
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const params = new URLSearchParams(search);
+    const isVisitorReactionJoin = location.pathname === '/arcade/reaction' && params.get('role') === 'visitor';
     const isDisplayRoute = location.pathname === '/arcade/display';
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // If role is arcade_display and not on /arcade/display, force redirect to /arcade/display
     if (userRole === 'arcade_display' && !isDisplayRoute) {
@@ -263,7 +277,15 @@ function MainRoutes({
         );
     }
 
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    if (isVisitorReactionJoin) {
+        return (
+            <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center font-title font-bold text-lg bg-[#f6f9fc]">Memuat Arena Reaction Battle...</div>}>
+                <div className="min-h-screen bg-blue-light/10 p-3 sm:p-6">
+                    <ReactionBattle currentUser={currentUser} userRole="visitor" showToast={showToast} />
+                </div>
+            </React.Suspense>
+        );
+    }
 
     // Dynamic Page Title mapping
     const getPageTitle = (pathname) => {
@@ -276,6 +298,7 @@ function MainRoutes({
             case '/statistik': return 'Statistik';
             case '/rekapan': return 'Rekapan Penjualan';
             case '/arcade/host': return 'Arcade Host';
+            case '/arcade/reaction': return 'Reaction Battle';
             case '/arcade/questions': return 'Bank Soal';
             case '/admin': return 'Admin Hub';
             default:
@@ -374,6 +397,7 @@ function MainRoutes({
                                 <Route path="/promo" element={<Bundles showToast={showToast} currentUser={currentUser} userRole={userRole} />} />
                                 <Route path="/rekapan" element={<Rekapan showToast={showToast} />} />
                                 <Route path="/arcade/host" element={<HostConsole currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
+                                <Route path="/arcade/reaction" element={<ReactionBattle currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
                                 <Route path="/arcade/questions" element={<QuestionBankManager currentUser={currentUser} userRole={userRole} showToast={showToast} />} />
                                 <Route path="/admin" element={
                                     userRole === 'super_admin' ? (
@@ -420,14 +444,16 @@ export default function App() {
                 email: `${demoRole}@kanvahati.internal`,
                 displayName: `QA ${demoRole.toUpperCase()}`
             };
-            setCurrentUser(mockUser);
-            setUserRole(demoRole);
-            setActiveCashier(mockUser.displayName);
-            setAuthLoading(false);
+            queueMicrotask(() => {
+                setCurrentUser(mockUser);
+                setUserRole(demoRole);
+                setActiveCashier(mockUser.displayName);
+                setAuthLoading(false);
+            });
             return;
         }
 
-        const unsubscribe = subscribeAuthState(({ user, role, displayName, isAuthenticated }) => {
+        const unsubscribe = subscribeAuthState(({ user, role, displayName }) => {
             setCurrentUser(user);
             setUserRole(role);
             if (displayName) {
@@ -483,6 +509,28 @@ export default function App() {
     }
 
     if (!currentUser) {
+        const isPublicVisitorReaction = typeof window !== 'undefined'
+            && window.location.pathname === '/arcade/reaction'
+            && new URLSearchParams(window.location.search).get('role') === 'visitor';
+
+        if (isPublicVisitorReaction) {
+            return (
+                <BrowserRouter>
+                    <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center font-title font-bold text-lg bg-[#f6f9fc]">Memuat Arena Reaction Battle...</div>}>
+                        <div className="min-h-screen bg-blue-light/10 p-3 sm:p-6">
+                            <ReactionBattle currentUser={null} userRole="visitor" showToast={showToast} />
+                        </div>
+                    </React.Suspense>
+                    <div className={`cute-toast fixed bottom-[25px] left-1/2 transform translate-x-[-50%] bg-yellow-light border-[3px] border-text rounded-full px-5 py-2.5 flex items-center gap-2.5 shadow-btn z-[10000] font-title text-[13.5px] font-bold pointer-events-none transition-transform duration-400 ${
+                        toast.show ? 'translate-y-0 opacity-100' : 'translate-y-[100px] opacity-0'
+                    }`}>
+                        <span className="toast-icon text-[15px]">{toast.icon}</span>
+                        <span className="toast-message text-text">{toast.message}</span>
+                    </div>
+                </BrowserRouter>
+            );
+        }
+
         return (
             <>
                 <Login 

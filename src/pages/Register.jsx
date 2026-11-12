@@ -1,7 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { getProducts, saveTransaction, getCategories, getBundles, fn_validate_cart_stock_integrity } from '../services/db';
+import { useState, useEffect, useMemo } from 'react';
+import QRCode from 'qrcode';
+import { getProducts, saveTransaction, getCategories, getBundles, getQrisConfig, fn_validate_cart_stock_integrity } from '../services/db';
+import { generateCheckoutDynamicQris, queryDanaPaymentStatus } from '../services/danaQris';
+import { resolveProductImageUrl } from '../utils/imageHelper';
+import { calculateTicketTotals, formatRupiah, sanitizeIntegerInput, toIntRupiah } from '../utils/currency';
 import { t } from '../services/translations';
 import BundleSuggestionBanner from '../components/BundleSuggestionBanner';
+
+// Sparkle burst effect (defined outside component so React purity rules stay clean)
+const triggerSparkles = (x, y) => {
+    const particlesList = ['✦', '★', '✧', '•'];
+    const count = 5 + Math.floor(Math.random() * 4);
+
+    for (let i = 0; i < count; i++) {
+        const particle = document.createElement('span');
+        particle.className = 'click-particle text-text';
+        particle.innerText = particlesList[Math.floor(Math.random() * particlesList.length)];
+
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = 2 + Math.random() * 3;
+        const size = 12 + Math.random() * 12;
+
+        particle.style.position = 'fixed';
+        particle.style.left = `${x}px`;
+        particle.style.top = `${y}px`;
+        particle.style.fontSize = `${size}px`;
+
+        document.body.appendChild(particle);
+
+        particle.animate([
+            { transform: 'translate(-50%, -50%) translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
+            {
+                transform: `translate(-50%, -50%) translate(${Math.cos(angle) * velocity * 22}px, ${Math.sin(angle) * velocity * 22}px) scale(0.4) rotate(${Math.random() * 360}deg)`,
+                opacity: 0
+            }
+        ], {
+            duration: 600,
+            easing: 'cubic-bezier(0.1, 0.8, 0.3, 1)',
+            fill: 'forwards'
+        }).onfinish = () => particle.remove();
+    }
+};
 
 export default function Register({ onCheckoutSuccess, showToast, activeCashier }) {
     const [products, setProducts] = useState([]);
@@ -12,13 +51,20 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [loading, setLoading] = useState(true);
     
-    // Bundles state
+    // Bundles & Transaction Discount state
     const [availableBundles, setAvailableBundles] = useState([]);
-    const [suggestedBundles, setSuggestedBundles] = useState([]);
     const [dismissedBundles, setDismissedBundles] = useState(new Set());
+    const [transactionDiscountInput, setTransactionDiscountInput] = useState('');
     
-    // QRIS scan overlay visibility state
+    // QRIS scan overlay visibility & dynamic QRIS state
     const [showQrisModal, setShowQrisModal] = useState(false);
+    const [qrisConfig, setQrisConfig] = useState(null);
+    const [dynamicQrisData, setDynamicQrisData] = useState(null);
+    const [qrisDataUrl, setQrisDataUrl] = useState('');
+    const [qrisLoading, setQrisLoading] = useState(false);
+    const [qrisError, setQrisError] = useState('');
+    const [qrisCheckStatus, setQrisCheckStatus] = useState('');
+    const [showStaticQrisFallback, setShowStaticQrisFallback] = useState(false);
 
     // Cash Payment Tender Modal state (Angsul / Kembalian calculator)
     const [showCashModal, setShowCashModal] = useState(false);
@@ -38,14 +84,16 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     const fetchData = async (forceRefetch = false) => {
         try {
             setLoading(true);
-            const [prodsData, catsData, bundlesData] = await Promise.all([
+            const [prodsData, catsData, bundlesData, qrisCfg] = await Promise.all([
                 getProducts(forceRefetch),
                 getCategories(forceRefetch),
-                getBundles(forceRefetch)
+                getBundles(forceRefetch),
+                getQrisConfig(forceRefetch)
             ]);
             setProducts(prodsData);
             setCategories(catsData);
             setAvailableBundles(bundlesData.filter(b => b.isActive));
+            setQrisConfig(qrisCfg);
         } catch (e) {
             console.error("Failed to load catalog data", e);
         } finally {
@@ -54,43 +102,28 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
     };
 
     useEffect(() => {
-        fetchData();
+        let mounted = true;
+        (async () => {
+            try {
+                const [prodsData, catsData, bundlesData, qrisCfg] = await Promise.all([
+                    getProducts(false),
+                    getCategories(false),
+                    getBundles(false),
+                    getQrisConfig(false)
+                ]);
+                if (!mounted) return;
+                setProducts(prodsData);
+                setCategories(catsData);
+                setAvailableBundles(bundlesData.filter(b => b.isActive));
+                setQrisConfig(qrisCfg);
+            } catch (e) {
+                console.error("Failed to load catalog data", e);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        })();
+        return () => { mounted = false; };
     }, []);
-
-    // Sparkle burst effect (using clean geometric stars instead of emojis)
-    const triggerSparkles = (x, y) => {
-        const particlesList = ['✦', '★', '✧', '•'];
-        const count = 5 + Math.floor(Math.random() * 4);
-        
-        for (let i = 0; i < count; i++) {
-            const particle = document.createElement('span');
-            particle.className = 'click-particle text-text';
-            particle.innerText = particlesList[Math.floor(Math.random() * particlesList.length)];
-            
-            const angle = Math.random() * Math.PI * 2;
-            const velocity = 2 + Math.random() * 3;
-            const size = 12 + Math.random() * 12;
-            
-            particle.style.position = 'fixed';
-            particle.style.left = `${x}px`;
-            particle.style.top = `${y}px`;
-            particle.style.fontSize = `${size}px`;
-            
-            document.body.appendChild(particle);
-            
-            particle.animate([
-                { transform: 'translate(-50%, -50%) translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
-                { 
-                    transform: `translate(-50%, -50%) translate(${Math.cos(angle) * velocity * 22}px, ${Math.sin(angle) * velocity * 22}px) scale(0.4) rotate(${Math.random() * 360}deg)`,
-                    opacity: 0 
-                }
-            ], {
-                duration: 600,
-                easing: 'cubic-bezier(0.1, 0.8, 0.3, 1)',
-                fill: 'forwards'
-            }).onfinish = () => particle.remove();
-        }
-    };
 
     // Add Item to ticket (supports variation selection)
     const handleAddToTicket = (e, product, selectedVar = null) => {
@@ -159,7 +192,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         if (e && e.clientX) triggerSparkles(e.clientX, e.clientY);
         if (!variationProduct || !variationProduct.variations) return;
 
-        let addedCount = 0;
+                let addedCount = 0;
         let totalItemsAdded = 0;
 
         setTicket(prevTicket => {
@@ -205,7 +238,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         });
 
         if (totalItemsAdded > 0) {
-            showToast(`${totalItemsAdded} item variasi berhasil ditambahkan! 🌸`, "✨");
+            showToast(`${totalItemsAdded} item (${addedCount} variasi) ditambahkan! 🌸`, "✨");
         }
 
         setVariationProduct(null);
@@ -290,23 +323,85 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         if (ticket.length === 0) return;
         setTicket([]);
         setDismissedBundles(new Set()); // Reset dismissed banners
+        setTransactionDiscountInput('');
         showToast(t.cleared, "🧹");
     };
 
     // Begin Checkout Flow
-    const handleCheckoutPress = () => {
+    const handleCheckoutPress = async () => {
         if (ticket.length === 0) {
             showToast(t.emptyTicket, "⚠️");
             return;
         }
 
+        const currentTotals = calculateTotals();
+
         if (paymentMethod === 'qris') {
-            setShowQrisModal(true); // Pop up QRIS scan layout first
+            setShowQrisModal(true);
+            setShowStaticQrisFallback(qrisConfig?.mode === 'static_image');
+            setQrisError('');
+            setQrisCheckStatus('');
+            setQrisDataUrl('');
+            setDynamicQrisData(null);
+
+            if (qrisConfig?.mode === 'static_image') {
+                return;
+            }
+
+            setQrisLoading(true);
+            try {
+                const cfg = qrisConfig || (await getQrisConfig());
+                const generated = await generateCheckoutDynamicQris({
+                    amountIdr: currentTotals.total,
+                    config: cfg
+                });
+                const qrPngUrl = await QRCode.toDataURL(generated.qrContent, {
+                    width: 280,
+                    margin: 1,
+                    color: { dark: '#171717', light: '#FFFFFF' },
+                    errorCorrectionLevel: 'M'
+                });
+                setDynamicQrisData(generated);
+                setQrisDataUrl(qrPngUrl);
+            } catch (err) {
+                console.error('Dynamic QRIS generation error:', err);
+                setQrisError(err.message || 'Gagal membuat QRIS dinamis');
+                setShowStaticQrisFallback(true);
+            } finally {
+                setQrisLoading(false);
+            }
         } else {
             // Open Cash Tender Modal for change calculation
-            const totals = calculateTotals();
-            setCashReceivedInput(String(totals.total)); // Pre-fill with exact amount
+            setCashReceivedInput(String(currentTotals.total)); // Pre-fill with exact amount
             setShowCashModal(true);
+        }
+    };
+
+    const handleCheckDanaStatus = async () => {
+        if (!dynamicQrisData?.partnerReferenceNo || !qrisConfig?.danaProxyUrl) return;
+        setQrisCheckStatus('checking');
+        try {
+            const res = await queryDanaPaymentStatus({
+                config: qrisConfig,
+                partnerReferenceNo: dynamicQrisData.partnerReferenceNo,
+                referenceNo: dynamicQrisData.referenceNo,
+                amountIdr: totals.total
+            });
+            setQrisCheckStatus(res.status);
+            if (res.status === 'PAID') {
+                showToast('Pembayaran DANA QRIS terkonfirmasi LUNAS!', '✅');
+                await completeCheckout({
+                    qrisRef: dynamicQrisData.partnerReferenceNo,
+                    qrisSource: 'dana_snap'
+                });
+            } else if (res.status === 'PENDING') {
+                showToast('Pembayaran belum masuk (PENDING).', '⏳');
+            } else if (res.status === 'CANCELLED') {
+                showToast('QRIS dibatalkan / kedaluwarsa.', '⚠️');
+            }
+        } catch {
+            setQrisCheckStatus('error');
+            showToast('Gagal memeriksa status ke server DANA.', '⚠️');
         }
     };
 
@@ -354,93 +449,47 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
             const transaction = await saveTransaction(expandedItems, totals, paymentMethod, activeCashier, totals.appliedBundles, cashDetails);
             setTicket([]);
             setDismissedBundles(new Set());
+            setTransactionDiscountInput('');
             setCashReceivedInput('');
             await fetchData(); // Refresh stock variables in grids
             onCheckoutSuccess(transaction);
             showToast(t.paymentSuccess, "🎉");
-        } catch (e) {
+        } catch {
             showToast("Gagal menyimpan transaksi ke database!", "⚠️");
         }
     };
 
-    // Calculate totals helper
-    const calculateTotals = () => {
-        let qty = 0;
-        let subtotal = 0;
-        let totalItemDiscount = 0;
-        let appliedBundles = [];
-        
-        ticket.forEach(item => {
-            if (item.isBundle) {
-                qty += item.bundleItems.reduce((sum, b) => sum + b.qty, 0); // count individual items
-                
-                // Calculate discount for display
-                let originalPrice = 0;
-                item.bundleItems.forEach(bItem => {
-                    const prod = products.find(p => p.id === bItem.productId);
-                    if (prod) {
-                        let price = prod.price;
-                        if (bItem.variationName && prod.variations) {
-                            const variation = prod.variations.find(v => v.name === bItem.variationName);
-                            if (variation) price = variation.price;
-                        }
-                        originalPrice += price * bItem.qty;
-                    }
-                });
-                
-                appliedBundles.push({
-                    bundleId: item.id,
-                    bundleName: item.name.replace('🎁 ', ''),
-                    originalPrice,
-                    bundlePrice: item.price,
-                    discount: Math.max(0, originalPrice - item.price)
-                });
-                
-                subtotal += originalPrice; // Add the original price to the subtotal
-            } else {
-                qty += item.qty;
-                subtotal += item.price * item.qty;
-                if ((item.discount || 0) > 0) {
-                    totalItemDiscount += item.discount * item.qty;
-                }
-            }
-        });
-        
-        const totalDiscount = appliedBundles.reduce((sum, b) => sum + b.discount, 0);
-        const total = subtotal - totalDiscount;
-        return { qty, subtotal, total, appliedBundles, totalItemDiscount };
-    };
+    // Calculate totals helper (strict integer Rupiah, zero decimals)
+    const calculateTotals = () => calculateTicketTotals(ticket, products, transactionDiscountInput);
 
     const totals = calculateTotals();
 
-    // Bundle Detection Logic
-    useEffect(() => {
-        if (availableBundles.length === 0 || products.length === 0) return;
-        
+    // Bundle Detection Logic (computed via useMemo instead of setState inside useEffect)
+    const suggestedBundles = useMemo(() => {
+        if (availableBundles.length === 0 || products.length === 0) return [];
+
         const nonBundleItems = ticket.filter(item => !item.isBundle);
-        let suggestions = [];
-        
+        const suggestions = [];
+
         availableBundles.forEach(bundle => {
             if (dismissedBundles.has(bundle.id)) return;
-            
-            // Check if all requirements are met
+
             let meetsRequirements = true;
             for (const reqItem of bundle.items) {
-                const matchingItems = nonBundleItems.filter(i => 
-                    i.id === reqItem.productId && 
+                const matchingItems = nonBundleItems.filter(i =>
+                    i.id === reqItem.productId &&
                     (reqItem.variationName ? i.variationName === reqItem.variationName : true)
                 );
-                
+
                 const totalMatchingQty = matchingItems.reduce((sum, i) => sum + i.qty, 0);
-                
+
                 if (totalMatchingQty < reqItem.qty) {
                     meetsRequirements = false;
                     break;
                 }
             }
-            
+
             if (meetsRequirements) {
-                // Calculate original price for banner display
                 let originalPrice = 0;
                 bundle.items.forEach(reqItem => {
                     const prod = products.find(p => p.id === reqItem.productId);
@@ -453,15 +502,15 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         originalPrice += price * reqItem.qty;
                     }
                 });
-                
+
                 suggestions.push({
                     ...bundle,
                     originalPrice
                 });
             }
         });
-        
-        setSuggestedBundles(suggestions);
+
+        return suggestions;
     }, [ticket, availableBundles, dismissedBundles, products]);
 
     const handleApplyBundle = (bundle) => {
@@ -528,10 +577,8 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
         });
     };
 
-    // Format all money values strictly in IDR Rupiah
-    const formatDisplayMoney = (value) => {
-        return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
-    };
+    // Format all money values strictly in integer IDR Rupiah
+    const formatDisplayMoney = (value) => formatRupiah(value);
 
     // Filters matching search/categories
     const filteredProducts = products.filter(product => {
@@ -595,7 +642,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                 <div className="p-3 sm:p-4 flex flex-col flex-grow">
                 <div className="catalog-controls flex flex-col gap-3 mb-4 shrink-0">
                     <div className="search-box relative flex items-center">
-                        <i className="fa-solid fa-magnifying-glass absolute left-3.5 text-text"></i>
+                        <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-text/70 pointer-events-none"></i>
                         <input 
                             type="text" 
                             value={searchQuery}
@@ -662,8 +709,10 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                     <div 
                                         key={product.id}
                                         onClick={(e) => handleAddToTicket(e, product)}
-                                        className={`pos-product-card sticker-cutout rounded-xl p-3.5 flex flex-col justify-between cursor-pointer select-none relative transition-all duration-150 hover:bg-white active:translate-y-[1px] ${
-                                            (hasDiscount || hasVarDiscount) ? 'bg-pink-light/50 border-pink' : hasVars ? 'bg-blue-light/40' : 'bg-yellow-light/60'
+                                        className={`pos-product-card sticker-cutout rounded-xl p-3 flex flex-col justify-between cursor-pointer select-none relative transition-all duration-150 hover:bg-white active:translate-y-[1px] ${
+                                            (product.stock || 0) <= 0
+                                                ? 'bg-gray-100 opacity-70'
+                                                : (hasDiscount || hasVarDiscount) ? 'bg-pink-light/50 border-pink' : hasVars ? 'bg-blue-light/40' : 'bg-yellow-light/60'
                                         }`}
                                     >
                                         {(hasDiscount || hasVarDiscount) && (
@@ -671,18 +720,51 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                                 ★ SALE!
                                             </div>
                                         )}
-                                        <div className="flex justify-between items-center gap-1 mb-1 pr-6">
-                                            <span className="text-[10px] font-extrabold opacity-70 font-tag tracking-wider truncate">{product.id}</span>
+                                        {(() => {
+                                            const imgUrl = resolveProductImageUrl(product.img);
+                                            return imgUrl ? (
+                                                <div className="w-full aspect-[4/3] rounded-lg border-2 border-text/80 bg-white overflow-hidden mb-2 relative">
+                                                    <img
+                                                        src={imgUrl}
+                                                        alt={product.name}
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    {(product.stock || 0) <= 0 && (
+                                                        <span className="absolute bottom-1 right-1 bg-rose-600 text-white text-[9px] font-tag font-black px-1.5 py-0.5 rounded border border-text uppercase">
+                                                            Habis
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ) : null;
+                                        })()}
+                                        <div className="flex justify-between items-center gap-1 mb-1">
+                                            <span className="text-[10px] font-extrabold opacity-75 font-tag tracking-wider truncate">{product.id}</span>
+                                            <span className={`text-[9.5px] font-tag font-extrabold px-1.5 py-0.2 rounded border shrink-0 ${
+                                                (product.stock || 0) <= 0
+                                                    ? 'bg-rose-100 text-rose-800 border-rose-500'
+                                                    : (product.stock || 0) <= 5
+                                                        ? 'bg-yellow text-text border-text'
+                                                        : 'bg-white/80 text-text/75 border-text/30'
+                                            }`}>
+                                                {(product.stock || 0) <= 0 ? 'Habis' : `Stok ${product.stock}`}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 mb-1.5 min-h-[18px]">
+                                        <div className="flex items-center gap-1.5 mb-1 min-h-[18px]">
                                             {hasVars && (
-                                                <span className="bg-yellow border-[1.5px] border-text rounded-md px-1.5 py-0.2 text-[8.5px] font-black text-text uppercase shrink-0 shadow-[1px_1px_0px_#171717]">
+                                                <span className="bg-yellow border-[1.5px] border-text rounded-md px-1.5 py-0.2 text-[9px] font-black text-text uppercase shrink-0 shadow-[1px_1px_0px_#171717]">
                                                     Variasi
                                                 </span>
                                             )}
+                                            {product.tag && (
+                                                <span className="bg-white border border-text/50 rounded px-1.5 py-0.2 text-[8.5px] font-bold text-text/80 uppercase truncate">
+                                                    {product.tag}
+                                                </span>
+                                            )}
                                         </div>
-                                        <h4 className="card-name font-title text-[13.5px] leading-tight mb-2.5 text-text font-bold line-clamp-2">{product.name}</h4>
-                                        <div className="card-row flex justify-between items-center border-t-2 border-dashed border-text/25 pt-2 mt-auto">
+                                        <h4 className="card-name font-title text-[13.5px] leading-snug mb-2 text-text font-bold line-clamp-2">{product.name}</h4>
+                                        <div className="card-row flex justify-between items-center border-t-2 border-dashed border-text/25 pt-2 mt-auto gap-1.5">
                                             <span className="card-price font-title text-[13.5px] font-bold text-text">
                                                 {hasDiscount ? (
                                                     <>
@@ -693,17 +775,17 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                                     <>
                                                         <span className="line-through opacity-50 text-[11px] block">{formatDisplayMoney(varMinOrigPrice)}</span>
                                                         <span className="text-pink">{formatDisplayMoney(varMinEffPrice)}</span>
-                                                        <span className="text-[9px] block font-body opacity-70 font-normal">(Mulai dari)</span>
+                                                        <span className="text-[9.5px] block font-body opacity-70 font-normal">(Mulai dari)</span>
                                                     </>
                                                 ) : (
                                                     <>
                                                         {formatDisplayMoney(hasVars ? varMinOrigPrice : product.price)}
-                                                        {hasVars && <span className="text-[9px] block font-body opacity-70 font-normal">(Mulai dari)</span>}
+                                                        {hasVars && <span className="text-[9.5px] block font-body opacity-70 font-normal">(Mulai dari)</span>}
                                                     </>
                                                 )}
                                             </span>
-                                            <span className="bg-white border-2 border-text rounded-lg px-2 py-1 text-[10px] font-title font-bold text-text shadow-[1.5px_1.5px_0px_#181818] flex items-center gap-1 group-hover:bg-yellow">
-                                                <i className="fa-solid fa-plus text-[9px] text-pink"></i>
+                                            <span className="bg-white border-2 border-text rounded-lg min-w-[36px] min-h-[36px] px-2.5 py-1 text-[11px] font-title font-bold text-text shadow-[1.5px_1.5px_0px_#181818] flex items-center justify-center gap-1 shrink-0">
+                                                <i className="fa-solid fa-plus text-[10px] text-pink"></i>
                                                 <span className="hidden sm:inline">Pilih</span>
                                             </span>
                                         </div>
@@ -739,9 +821,9 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                     <button 
                         onClick={handleClearTicket}
                         disabled={ticket.length === 0}
-                        className={`btn-clear-ticket border-[1.5px] rounded-md px-2 py-1 font-tag text-[10px] font-black uppercase flex items-center gap-1 transition-all ${
+                        className={`btn-clear-ticket border-[1.5px] rounded-md px-2.5 py-1 font-tag text-[10px] font-black uppercase flex items-center gap-1 transition-all ${
                             ticket.length === 0
-                                ? 'bg-gray-100 text-gray-400 border-gray-300 opacity-60 cursor-not-allowed select-none shadow-none'
+                                ? 'bg-gray-100 text-gray-600 border-gray-400 opacity-80 cursor-not-allowed select-none shadow-none'
                                 : 'bg-white border-text text-text cursor-pointer hover:bg-pink hover:text-white shadow-[1px_1px_0px_#171717]'
                         }`}
                     >
@@ -812,16 +894,55 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         </div>
                         {totals.totalItemDiscount > 0 && (
                             <div className="summary-line flex justify-between text-xs text-pink font-bold">
-                                <span><i className="fa-solid fa-tag"></i> Diskon Item (Cuci Gudang):</span>
+                                <span><i className="fa-solid fa-tag"></i> Diskon Item:</span>
                                 <span>-{formatDisplayMoney(totals.totalItemDiscount)} (sudah terpotong)</span>
                             </div>
                         )}
                         {totals.appliedBundles && totals.appliedBundles.length > 0 && (
                             <div className="summary-line flex justify-between text-xs text-pink font-bold">
                                 <span>Total Diskon Promo:</span>
-                                <span>-{formatDisplayMoney(totals.appliedBundles.reduce((s, b) => s + b.discount, 0))}</span>
+                                <span>-{formatDisplayMoney(totals.bundleDiscount)}</span>
                             </div>
                         )}
+
+                        {/* Optional Transaction-Level Discount (only shown / active when cashier enters > 0) */}
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                            <label htmlFor="tx-discount-input" className="text-[11px] font-tag font-bold uppercase tracking-wide text-text/75 flex items-center gap-1 shrink-0">
+                                <i className="fa-solid fa-percent text-[10px] text-pink"></i>
+                                <span>Diskon Transaksi:</span>
+                            </label>
+                            <div className="relative flex items-center w-[140px]">
+                                <span className="absolute left-2 text-[11px] font-title font-bold text-text/60 pointer-events-none">Rp</span>
+                                <input
+                                    id="tx-discount-input"
+                                    type="text"
+                                    inputMode="numeric"
+                                    disabled={ticket.length === 0}
+                                    value={transactionDiscountInput}
+                                    onChange={(e) => setTransactionDiscountInput(sanitizeIntegerInput(e.target.value))}
+                                    placeholder="0"
+                                    className="w-full border-2 border-text rounded-lg py-1 pl-7 pr-6 text-xs font-title font-bold text-right bg-white outline-none focus:bg-yellow-light/30 disabled:opacity-50"
+                                />
+                                {transactionDiscountInput && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setTransactionDiscountInput('')}
+                                        title="Hapus diskon transaksi"
+                                        className="absolute right-1.5 text-[10px] text-text/50 hover:text-pink cursor-pointer"
+                                    >
+                                        <i className="fa-solid fa-xmark"></i>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {totals.transactionDiscount > 0 && (
+                            <div className="summary-line flex justify-between text-xs text-pink font-bold">
+                                <span>Potongan Transaksi:</span>
+                                <span>-{formatDisplayMoney(totals.transactionDiscount)}</span>
+                            </div>
+                        )}
+
                         <div className="summary-line font-bold flex justify-between text-[16px] border-t border-text/15 pt-1.5">
                             <span>{t.totalAmount}:</span>
                             <span>{formatDisplayMoney(totals.total)}</span>
@@ -860,7 +981,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         disabled={ticket.length === 0 || totals.total <= 0}
                         className={`btn btn-primary btn-block border-[2.5px] border-text rounded-xl font-tag text-[13px] font-black uppercase tracking-wider px-6 py-3 transition-all flex items-center justify-center gap-2 w-full ${
                             ticket.length === 0 || totals.total <= 0
-                                ? 'bg-gray-200 text-gray-400 border-gray-400 opacity-60 cursor-not-allowed select-none shadow-none'
+                                ? 'bg-gray-200 text-gray-600 border-gray-500 opacity-85 cursor-not-allowed select-none shadow-none'
                                 : 'bg-pink text-text shadow-[3px_3px_0px_#171717] hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#171717] active:translate-y-[1px] active:shadow-[1px_1px_0px_#171717] cursor-pointer'
                         }`}
                     >
@@ -876,24 +997,32 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                     <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[94vw] max-w-[420px] max-h-[88vh] overflow-hidden flex flex-col p-4 sm:p-5 text-text relative">
                         <div className="washi-tape tape-yellow-1 absolute top-[-10px] left-8 transform rotate-[-4deg] h-6 w-24 bg-pink-light"></div>
                         
-                        {/* Header Bar */}
-                        <div className="w-full flex justify-between items-center border-b border-text/15 pb-2 mb-3">
-                            <div>
-                                <span className="font-tag text-[10px] font-black uppercase tracking-wider text-pink block">Multi-Selection</span>
-                                <h3 className="font-title text-base font-bold text-text truncate max-w-[260px] sm:max-w-[300px]" title={variationProduct.name}>
-                                    {variationProduct.name}
-                                </h3>
-                            </div>
-                            <button 
-                                onClick={() => {
-                                    setVariationProduct(null);
-                                    setSelectedVarQuantities({});
-                                }}
-                                className="w-8 h-8 rounded-full border-2 border-text bg-yellow-light hover:bg-yellow flex items-center justify-center text-text hover:text-pink transition-transform hover:scale-105 cursor-pointer shadow-[1px_1px_0px_#181818]"
-                            >
-                                <i className="fa-solid fa-xmark text-sm"></i>
-                            </button>
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pb-1 border-b border-text/15 mb-3">
+                    <div className="flex items-center gap-2.5 w-full">
+                        {resolveProductImageUrl(variationProduct.img) && (
+                            <img
+                                src={resolveProductImageUrl(variationProduct.img)}
+                                alt={variationProduct.name}
+                                className="w-11 h-11 rounded-lg border-2 border-text object-cover shrink-0 bg-white"
+                            />
+                        )}
+                        <div className="min-w-0 flex-grow">
+                            <span className="font-tag text-[10px] font-black uppercase tracking-wider text-pink block">Multi-Selection</span>
+                            <h3 className="font-title text-base font-bold text-text truncate" title={variationProduct.name}>
+                                {variationProduct.name}
+                            </h3>
                         </div>
+                    </div>
+                    <button 
+                        onClick={() => {
+                            setVariationProduct(null);
+                            setSelectedVarQuantities({});
+                        }}
+                        className="w-8 h-8 rounded-full border-2 border-text bg-yellow-light hover:bg-yellow flex items-center justify-center text-text hover:text-pink transition-transform hover:scale-105 cursor-pointer shadow-[1px_1px_0px_#181818] shrink-0 self-end sm:self-center"
+                    >
+                        <i className="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
                         
                         <p className="text-[11px] font-body text-text/70 mb-2.5">
                             Tentukan jumlah tiap opsi variasi yang dibeli:
@@ -1047,17 +1176,17 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                         <div className="flex flex-col gap-1.5 mb-3">
                             <label className="text-[11px] font-bold uppercase text-text/80 font-tag tracking-wider flex justify-between">
                                 <span>Uang Diterima dari Pembeli:</span>
-                                <span className="text-pink font-bold">{formatDisplayMoney(parseFloat(cashReceivedInput) || 0)}</span>
+                                <span className="text-pink font-bold">{formatDisplayMoney(toIntRupiah(cashReceivedInput))}</span>
                             </label>
                             <div className="relative flex items-center">
                                 <span className="absolute left-3 font-title font-bold text-sm text-text/60">Rp</span>
                                 <input 
-                                    type="number"
-                                    min="0"
+                                    type="text"
+                                    inputMode="numeric"
                                     autoFocus
                                     placeholder="0"
                                     value={cashReceivedInput}
-                                    onChange={(e) => setCashReceivedInput(e.target.value)}
+                                    onChange={(e) => setCashReceivedInput(sanitizeIntegerInput(e.target.value))}
                                     className="w-full border-2 border-text rounded-xl py-2 pl-9 pr-3 text-base font-title font-bold text-text outline-none focus:bg-yellow-light/20 bg-white"
                                 />
                             </div>
@@ -1096,7 +1225,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
                         {/* Change / Shortage Display Box */}
                         {(() => {
-                            const received = parseFloat(cashReceivedInput) || 0;
+                            const received = toIntRupiah(cashReceivedInput);
                             const change = received - totals.total;
                             const isSufficient = change >= 0;
 
@@ -1120,7 +1249,7 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
 
                         {/* Submit Action Button */}
                         {(() => {
-                            const received = parseFloat(cashReceivedInput) || 0;
+                            const received = toIntRupiah(cashReceivedInput);
                             const change = Math.max(0, received - totals.total);
                             const isSufficient = received >= totals.total;
 
@@ -1144,13 +1273,13 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                 </div>
             )}
 
-            {/* Interactive QRIS Scan Overlay Modal */}
+            {/* Interactive Dynamic QRIS Scan Overlay Modal */}
             {showQrisModal && (
                 <div className="fixed inset-0 bg-[#181818]/50 backdrop-blur-sm z-[10001] flex justify-center items-center p-4">
-                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[340px] overflow-hidden flex flex-col items-center p-5 text-text relative">
+                    <div className="bg-white border-[3px] border-text rounded-2xl shadow-card w-[94vw] max-w-[360px] overflow-hidden flex flex-col items-center p-5 text-text relative">
                         <div className="washi-tape tape-ticket absolute top-[-10px] left-10 transform rotate-[-4deg] h-6 w-24"></div>
                         
-                        <div className="w-full flex justify-between items-center border-b border-text/10 pb-2.5 mb-4">
+                        <div className="w-full flex justify-between items-center border-b border-text/10 pb-2.5 mb-3">
                             <span className="font-title text-base font-bold text-center w-full">{t.qrisScan}</span>
                             <button 
                                 onClick={() => setShowQrisModal(false)}
@@ -1159,27 +1288,99 @@ export default function Register({ onCheckoutSuccess, showToast, activeCashier }
                                 <i className="fa-solid fa-xmark text-lg"></i>
                             </button>
                         </div>
+
+                        {/* Dynamic / Static mode badge */}
+                        <div className="flex items-center justify-center gap-1.5 mb-3 flex-wrap">
+                            <span className={`text-[10px] font-tag font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-text ${
+                                showStaticQrisFallback
+                                    ? 'bg-yellow-light text-text'
+                                    : dynamicQrisData?.source === 'dana_snap'
+                                        ? 'bg-blue-light text-text'
+                                        : 'bg-emerald-100 text-emerald-900'
+                            }`}>
+                                {showStaticQrisFallback
+                                    ? 'QRIS Statis (Input Manual)'
+                                    : dynamicQrisData?.source === 'dana_snap'
+                                        ? 'DANA SNAP Dynamic QRIS'
+                                        : 'QRIS Dinamis (Nominal Otomatis)'}
+                            </span>
+                            {dynamicQrisData?.merchantName && !showStaticQrisFallback && (
+                                <span className="text-[10px] font-tag font-bold bg-pink-light border border-text/40 px-2 py-0.5 rounded-full">
+                                    {dynamicQrisData.merchantName}
+                                </span>
+                            )}
+                        </div>
                         
                         {/* QRIS Code Graphic */}
-                        <div className="border-[3px] border-text p-1.5 rounded-xl bg-white mb-4 relative shadow-[4px_4px_0px_#181818] w-[200px] h-[200px] flex items-center justify-center overflow-hidden">
-                            <img src="/qris.png" alt="QRIS Code" className="w-full h-full object-contain" />
+                        <div className="border-[3px] border-text p-2 rounded-xl bg-white mb-3 relative shadow-[4px_4px_0px_#181818] w-[220px] h-[220px] flex items-center justify-center overflow-hidden">
+                            {qrisLoading ? (
+                                <div className="flex flex-col items-center gap-2 text-xs font-bold text-text/70">
+                                    <i className="fa-solid fa-spinner fa-spin text-2xl text-pink"></i>
+                                    <span>Membuat QR Dinamis...</span>
+                                </div>
+                            ) : showStaticQrisFallback || !qrisDataUrl ? (
+                                <img src="/qris.png" alt="QRIS Code" className="w-full h-full object-contain" />
+                            ) : (
+                                <img src={qrisDataUrl} alt="Dynamic QRIS Code" className="w-full h-full object-contain" />
+                            )}
                         </div>
+
+                        {qrisError && (
+                            <p className="text-[10.5px] text-rose-700 font-bold text-center mb-2">
+                                {qrisError} (Menampilkan fallback QRIS statis)
+                            </p>
+                        )}
 
                         {/* Invoice billing details */}
-                        <div className="w-full bg-blue-light border-2 border-text rounded-lg p-3 text-center mb-4 font-bold text-sm">
-                            <div>Total: <span className="text-pink font-title font-extrabold text-base">{formatDisplayMoney(totals.total)}</span></div>
+                        <div className="w-full bg-blue-light border-2 border-text rounded-xl p-3 text-center mb-3 font-bold text-sm">
+                            <div>Total: <span className="text-pink font-title font-extrabold text-lg">{formatDisplayMoney(totals.total)}</span></div>
+                            {dynamicQrisData?.partnerReferenceNo && !showStaticQrisFallback && (
+                                <div className="text-[10px] font-mono text-text/70 mt-0.5">
+                                    Ref: {dynamicQrisData.partnerReferenceNo}
+                                </div>
+                            )}
                         </div>
 
-                        <p className="text-[11px] text-center opacity-85 leading-relaxed mb-5">
-                            {t.scanPrompt}
+                        <p className="text-[11px] text-center opacity-85 leading-relaxed mb-3">
+                            {showStaticQrisFallback
+                                ? t.scanPrompt
+                                : 'Nominal sudah terkunci otomatis di kode QR. Pindai dengan DANA, GoPay, OVO, ShopeePay, atau Mobile Banking.'}
                         </p>
 
-                        <button 
-                            onClick={completeCheckout}
-                            className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[13px] px-6 py-2 shadow-btn hover:bg-white hover:translate-y-[-3px] hover:shadow-[5px_5px_0px_#181818] transition-all w-full cursor-pointer"
-                        >
-                            Lunas
-                        </button>
+                        <div className="flex flex-col gap-2 w-full">
+                            {dynamicQrisData?.source === 'dana_snap' && qrisConfig?.danaProxyUrl && !showStaticQrisFallback && (
+                                <button
+                                    type="button"
+                                    disabled={qrisCheckStatus === 'checking'}
+                                    onClick={handleCheckDanaStatus}
+                                    className="btn bg-yellow text-text border-2 border-text rounded-full font-title text-xs px-4 py-2 shadow-[2px_2px_0px_#181818] hover:bg-white transition-all w-full cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                    <i className={`fa-solid ${qrisCheckStatus === 'checking' ? 'fa-spinner fa-spin' : 'fa-magnifying-glass-dollar'}`}></i>
+                                    <span>{qrisCheckStatus === 'checking' ? 'Mengecek DANA...' : 'Cek Status Pembayaran DANA'}</span>
+                                </button>
+                            )}
+
+                            <button 
+                                type="button"
+                                onClick={() => completeCheckout(dynamicQrisData && !showStaticQrisFallback ? {
+                                    qrisRef: dynamicQrisData.partnerReferenceNo,
+                                    qrisSource: dynamicQrisData.source
+                                } : null)}
+                                className="btn bg-pink text-text border-[3px] border-text rounded-full font-title text-[13px] px-6 py-2.5 shadow-btn hover:bg-white hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_#181818] transition-all w-full cursor-pointer"
+                            >
+                                Lunas & Simpan Transaksi
+                            </button>
+
+                            {qrisDataUrl && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowStaticQrisFallback(prev => !prev)}
+                                    className="text-[11px] font-bold text-text/70 hover:text-pink underline cursor-pointer py-1"
+                                >
+                                    {showStaticQrisFallback ? 'Gunakan QRIS Dinamis' : 'Gunakan Gambar QRIS Statis (/qris.png)'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

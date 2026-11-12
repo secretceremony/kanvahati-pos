@@ -23,6 +23,107 @@ export const ARCADE_GLOBAL_RULES = {
     }
 };
 
+export const QUIZ_DIFFICULTIES = {
+    easy: {
+        id: 'easy',
+        label: 'Easy',
+        description: 'Target standar & waktu ekstra (+10 detik)',
+        timerDeltaSec: 10,
+        targetMultiplier: 0.8
+    },
+    normal: {
+        id: 'normal',
+        label: 'Normal',
+        description: 'Aturan standar booth Kanvahati (30 detik)',
+        timerDeltaSec: 0,
+        targetMultiplier: 1
+    },
+    hard: {
+        id: 'hard',
+        label: 'Hard',
+        description: 'Waktu lebih ketat (-5 detik) & tantangan penuh',
+        timerDeltaSec: -5,
+        targetMultiplier: 1.2
+    }
+};
+
+export const QUIZ_MODES = {
+    classic: {
+        id: 'classic',
+        label: 'Classic',
+        description: 'Mode tantangan booth reguler sesuai definisi challenge',
+        overrideTimerSec: null,
+        targetCountOverride: null
+    },
+    speed_round: {
+        id: 'speed_round',
+        label: 'Speed Round',
+        description: 'Timer cepat 15 detik untuk adu refleks & ingatan instan',
+        overrideTimerSec: 15,
+        targetCountOverride: null
+    },
+    boss_question: {
+        id: 'boss_question',
+        label: 'Boss Question',
+        description: 'Mode Final Boss 45 detik — cocok untuk soal tersulit berhadiah utama',
+        overrideTimerSec: 45,
+        targetCountOverride: null
+    }
+};
+
+export const REACTION_BATTLE_CONFIG = {
+    BEST_OF_ROUNDS: 3,
+    WINS_NEEDED: 2,
+    MIN_DELAY_MS: 1800,
+    MAX_DELAY_MS: 5200,
+    ROUND_TIMEOUT_MS: 10000,
+    FALSE_START_GRACE_MS: 0
+};
+
+export const DEFAULT_EVENT_ARCADE_CONFIG = {
+    maxPlaysPerParticipant: 1,
+    dailySketchQuota: 20,
+    dailyStickerQuota: 200,
+    quizEnabled: true,
+    reactionEnabled: true
+};
+
+/**
+ * Compute mode + difficulty specific timer duration and target count cleanly
+ * without breaking default Normal + Classic behavior (30s, gameDef.targetCount).
+ */
+export function resolveQuizModeParams(gameDef, difficulty = 'normal', quizMode = 'classic') {
+    const baseTimer = gameDef?.timeLimitSec || ARCADE_GLOBAL_RULES.TIME_LIMIT_SECONDS;
+    const baseTarget = gameDef?.targetCount || 1;
+    const diffCfg = QUIZ_DIFFICULTIES[difficulty] || QUIZ_DIFFICULTIES.normal;
+    const modeCfg = QUIZ_MODES[quizMode] || QUIZ_MODES.classic;
+
+    let timerDurationSec = modeCfg.overrideTimerSec !== null
+        ? modeCfg.overrideTimerSec
+        : Math.max(10, baseTimer + diffCfg.timerDeltaSec);
+
+    // Boss question with Hard stays challenging but fair
+    if (quizMode === 'boss_question' && difficulty === 'hard') {
+        timerDurationSec = 40;
+    } else if (quizMode === 'speed_round' && difficulty === 'easy') {
+        timerDurationSec = 20;
+    }
+
+    let targetCount = baseTarget;
+    if (baseTarget > 1 && difficulty !== 'normal') {
+        targetCount = Math.max(2, Math.round(baseTarget * diffCfg.targetMultiplier));
+    }
+
+    return {
+        difficulty: diffCfg.id,
+        difficultyLabel: diffCfg.label,
+        quizMode: modeCfg.id,
+        quizModeLabel: modeCfg.label,
+        timerDurationSec,
+        targetCount
+    };
+}
+
 // Admin configurable letter whitelist for G06 (excludes excessively rare letters: Q, V, X, Z)
 export const DEFAULT_ALPHABET_WHITELIST = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'M', 'N', 'R', 'S', 'T', 'Y'];
 

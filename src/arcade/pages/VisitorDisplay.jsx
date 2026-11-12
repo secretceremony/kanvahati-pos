@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { GAME_DEFINITIONS } from '../data/gameConfig.js';
 import { 
@@ -7,7 +7,7 @@ import {
     getEstimatedServerClockOffset 
 } from '../services/arcadeSync.js';
 
-export default function VisitorDisplay({ currentUser, userRole, showToast }) {
+export default function VisitorDisplay() {
     const [searchParams, setSearchParams] = useSearchParams();
     const eventId = searchParams.get('event') || 'CF20';
     const stationId = searchParams.get('station') || 'station-1';
@@ -15,7 +15,6 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
     // Real-Time Session State from Firestore
     const [sessionData, setSessionData] = useState(null);
     const [connectionStatus, setConnectionStatus] = useState('connecting'); // 'online' | 'offline' | 'connecting'
-    const [lastSyncTime, setLastSyncTime] = useState(null);
     const [clockOffsetMs, setClockOffsetMs] = useState(0);
 
     // Synchronized Countdown State
@@ -25,7 +24,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
     // Fullscreen state
     const [isFullscreen, setIsFullscreen] = useState(false);
     const containerRef = useRef(null);
-    const snapshotMetaRef = useRef({ receivePerfTime: Date.now() });
+    const snapshotMetaRef = useRef({ receivePerfTime: 0 });
 
     // 1. Clock skew calibration on mount
     useEffect(() => {
@@ -61,14 +60,12 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
 
     // 4. Real-time Firestore onSnapshot Subscription
     useEffect(() => {
-        setConnectionStatus('connecting');
         const unsubscribe = subscribeToStationSession(
             eventId,
             stationId,
             (safeData, meta) => {
                 setSessionData(safeData);
                 setConnectionStatus('online');
-                setLastSyncTime(new Date());
                 snapshotMetaRef.current = meta || { receivePerfTime: performance.now() };
             },
             (error) => {
@@ -85,12 +82,13 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
     const demoStatus = searchParams.get('demoStatus');
     const demoGame = searchParams.get('demoGame');
     const demoProgress = searchParams.get('demoProgress') ? Number(searchParams.get('demoProgress')) : 0;
+    const demoTag = searchParams.get('demoTag') || 'Mika-chan';
 
     const currentStatus = (demoStatus || sessionData?.status || 'idle').toLowerCase();
     const activeGameId = demoGame || sessionData?.gameId || 'G01';
     const currentGameDef = GAME_DEFINITIONS[activeGameId] || null;
 
-    const effectiveSession = demoStatus ? {
+    const effectiveSession = useMemo(() => (demoStatus ? {
         ...(sessionData || {}),
         status: currentStatus,
         gameId: activeGameId,
@@ -99,7 +97,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
         targetProgress: currentGameDef?.targetCount || 1,
         currentProgress: demoProgress,
         timerDurationSec: 30,
-        participantDisplayTag: searchParams.get('demoTag') || 'Mika-chan',
+        participantDisplayTag: demoTag,
         revealedMediaUrl: '/arcade/revealed_placeholder.svg',
         mediaUrl: '/arcade/cropped_placeholder.svg',
         trait: 'Rambut Putih / Perak',
@@ -115,7 +113,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
             "Vinsmoke Sanji",
             "Nami"
         ]
-    } : sessionData;
+    } : sessionData), [demoStatus, sessionData, currentStatus, activeGameId, currentGameDef, demoProgress, demoTag]);
 
     // 5. Synchronized Countdown Animation Frame Loop
     useEffect(() => {
@@ -282,7 +280,7 @@ export default function VisitorDisplay({ currentUser, userRole, showToast }) {
  * 1. IDLE SCREEN COMPONENT
  * -------------------------------------------------------------
  */
-function IdleScreen({ eventId, stationId }) {
+function IdleScreen() {
     return (
         <div className="w-full max-w-4xl flex flex-col items-center text-center animate-[fadeIn_0.5s_ease-out]">
             {/* Header Kawaii Badge */}
@@ -424,11 +422,23 @@ function PlayingScreen({ session, gameDef, remainingSeconds, timerProgress }) {
                         {gameId}
                     </div>
                     <div>
-                        <div className="font-title text-base sm:text-lg font-bold text-text leading-tight">
-                            {session?.gameTitle || gameDef?.title}
+                        <div className="font-title text-base sm:text-lg font-bold text-text leading-tight flex items-center gap-2 flex-wrap">
+                            <span>{session?.gameTitle || gameDef?.title}</span>
+                            {session?.quizMode && session.quizMode !== 'classic' && (
+                                <span className="text-[10px] font-tag font-black uppercase bg-yellow border border-text px-2 py-0.5 rounded-full">
+                                    {session.quizMode === 'speed_round' ? '⚡ SPEED ROUND' : '👑 BOSS QUESTION'}
+                                </span>
+                            )}
+                            {session?.difficulty && session.difficulty !== 'normal' && (
+                                <span className={`text-[10px] font-tag font-black uppercase border border-text px-2 py-0.5 rounded-full ${
+                                    session.difficulty === 'hard' ? 'bg-rose-200 text-rose-900' : 'bg-blue-light text-text'
+                                }`}>
+                                    {session.difficulty.toUpperCase()}
+                                </span>
+                            )}
                         </div>
                         <div className="text-xs text-text/70 font-semibold">
-                            Target: <span className="text-pink font-bold">{targetProgress}</span> • Batas Waktu: 30 Detik
+                            Target: <span className="text-pink font-bold">{targetProgress}</span> • Batas Waktu: {session?.timerDurationSec || 30} Detik
                         </div>
                     </div>
                 </div>
@@ -502,7 +512,7 @@ function PlayingScreen({ session, gameDef, remainingSeconds, timerProgress }) {
 /**
  * G01: Anime Speedrun — 10 Anime Instruction & Progress 0/10
  */
-function G01DisplayView({ session, currentProgress, targetProgress }) {
+function G01DisplayView({ session, currentProgress }) {
     return (
         <div className="flex flex-col items-center text-center">
             <h3 className="font-title text-xl sm:text-2xl font-bold text-text mb-2">
@@ -541,7 +551,7 @@ function G01DisplayView({ session, currentProgress, targetProgress }) {
 /**
  * G02: Character Hunt — Trait & Progress 0/5
  */
-function G02DisplayView({ session, currentProgress, targetProgress }) {
+function G02DisplayView({ session, currentProgress }) {
     const trait = session?.trait || "Rambut Putih / Perak";
     return (
         <div className="flex flex-col items-center text-center">
@@ -585,7 +595,7 @@ function G02DisplayView({ session, currentProgress, targetProgress }) {
 /**
  * G03: Anime Genre Explorer — 3 Genres & Anime Examples
  */
-function G03DisplayView({ session, currentProgress, targetProgress }) {
+function G03DisplayView({ currentProgress }) {
     return (
         <div className="flex flex-col items-center text-center">
             <h3 className="font-title text-xl sm:text-2xl font-bold text-text mb-2">
@@ -648,7 +658,7 @@ function G04DisplayView({ session }) {
 /**
  * G05: Guess the Anime Opening — Audio Visualizer Badge (No Double Audio)
  */
-function G05DisplayView({ session }) {
+function G05DisplayView() {
     return (
         <div className="flex flex-col items-center text-center">
             <h3 className="font-title text-xl sm:text-2xl font-bold text-text mb-2">
@@ -688,7 +698,7 @@ function G05DisplayView({ session }) {
 /**
  * G06: Character Alphabet Rush — Big Letter Badge & Progress 0/5
  */
-function G06DisplayView({ session, currentProgress, targetProgress }) {
+function G06DisplayView({ session, currentProgress }) {
     const letter = session?.letter || "S";
     return (
         <div className="flex flex-col items-center text-center">
@@ -735,7 +745,7 @@ function G06DisplayView({ session, currentProgress, targetProgress }) {
 /**
  * G07: Three-Hint Character — Panitia Reads 3 Hints to Participant
  */
-function G07DisplayView({ session, currentProgress }) {
+function G07DisplayView() {
     return (
         <div className="flex flex-col items-center text-center">
             <h3 className="font-title text-xl sm:text-2xl font-bold text-text mb-2">
@@ -884,7 +894,7 @@ function G10DisplayView({ session }) {
  * 4. WON SCREEN COMPONENT (Celebration & Prize Showcase)
  * -------------------------------------------------------------
  */
-function WonScreen({ session, gameDef }) {
+function WonScreen({ session }) {
     return (
         <div className="w-full max-w-3xl flex flex-col items-center text-center animate-[popIn_0.5s_cubic-bezier(0.175,0.885,0.32,1.15)]">
             
@@ -993,7 +1003,7 @@ function WonScreen({ session, gameDef }) {
  * 5. LOST SCREEN COMPONENT (Consolation & Next Time)
  * -------------------------------------------------------------
  */
-function LostScreen({ session, gameDef }) {
+function LostScreen({ session }) {
     const reason = session?.disqualificationReason || "Waktu Habis / Belum Tepat";
 
     return (

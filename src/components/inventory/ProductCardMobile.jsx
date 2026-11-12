@@ -1,5 +1,5 @@
-import React from 'react';
 import DieCutBadge from '../common/DieCutBadge';
+import { resolveProductImageUrl } from '../../utils/imageHelper';
 
 /**
  * Mobile-first Neobrutalist Product Card
@@ -33,6 +33,13 @@ export default function ProductCardMobile({
                         onChange={(e) => onSelect(e.target.checked)}
                         className="w-4 h-4 cursor-pointer accent-pink mt-0.5 shrink-0"
                     />
+                    {resolveProductImageUrl(product.img) && (
+                        <img
+                            src={resolveProductImageUrl(product.img)}
+                            alt={product.name}
+                            className="w-10 h-10 rounded-lg border border-text object-cover shrink-0 bg-white"
+                        />
+                    )}
                     <div className="min-w-0">
                         <span className="font-mono text-[10px] font-bold opacity-60 block truncate">{product.id}</span>
                         <h4 className="font-title font-bold text-sm text-text leading-tight mt-0.5 line-clamp-2">{product.name}</h4>

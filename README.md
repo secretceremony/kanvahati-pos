@@ -32,20 +32,21 @@ The project is maintained for KANVAHATI rather than distributed as a general-pur
 
 | Area | Capabilities |
 | --- | --- |
-| **Checkout** | Product catalog, variants, cart management, stock checks, cash and QRIS payment flows, and digital receipts |
+| **Checkout** | Product catalog with merch thumbnails, variants, cart management, stock checks, cash change calculator, dynamic QRIS (EMVCo TLV + optional DANA SNAP bridge) & static fallback, and digital receipts |
 | **Promotions** | Bundles and promotional pricing |
-| **Inventory** | Product, category, variant, and stock management |
-| **Transactions** | Sales history, receipt reprints, and refunds with inventory updates |
+| **Inventory** | Product, category, variant, merch photo upload/compression, stock health filters, XLSX/CSV import & export, and audited stock adjustments (`+` / `-` / Opname) |
+| **Transactions** | Sales history, `qrisRef` tracking, receipt reprints, and refunds with inventory updates |
 | **Cash management** | Cash drawer balances and cash movement records |
 | **Reporting** | Sales statistics, transaction logs, and financial recaps |
-| **Administration** | Firebase sign-in, staff roles, Super Admin tools, and audit logging |
-| **Arcade** | Staff-led fandom challenges, question management, synchronized displays, and prize-claim records |
+| **Administration** | Firebase sign-in, staff roles, Super Admin tools (including Dynamic QRIS configuration & QR image decoder), and audit logging |
+| **Arcade** | Staff-led Quiz Challenge (10 challenges, Easy/Normal/Hard, Classic/Speed Round/Boss Question), real-time 2-device Reaction Battle PvP (Best-of-3 via QR/code), question management, synchronized displays, and prize-claim quotas |
 
 ### KANVAHATI Arcade
 
-The Arcade is a visitor engagement module operated by booth staff. It provides a **Host Console** for selecting and evaluating challenges, alongside a **Visitor Display** that presents questions, media, timers, and outcomes. Staff can manage the question bank, track participants, and record prize claims.
+The Arcade is a visitor engagement module operated by booth staff with two modes:
 
-The current implementation centers on staff-controlled anime and fandom challenges. Additional formats, including expanded quiz modes and a two-player reaction game, are being considered separately and should not be assumed to be available in the current build.
+- **Quiz Challenge**: Staff-controlled anime & fandom challenges with configurable **Difficulty** (`Easy`, `Normal`, `Hard`), **Quiz Modes** (`Classic`, `Speed Round`, `Boss Question`), non-repeating question selection, synchronized `Host Console` & `Visitor Display`, and daily prize quotas.
+- **Reaction Battle**: Real-time two-device **Best-of-3 PvP** reaction duel between booth staff and a visitor (join via 6-character room code or QR code), featuring randomized start delays, false-start detection, server-timestamped tap adjudication, and rematch support.
 
 ## Technology
 
@@ -53,8 +54,9 @@ The current implementation centers on staff-controlled anime and fandom challeng
 | --- | --- |
 | Interface | React 19, JavaScript |
 | Build tooling | Vite 8 |
-| Styling | Tailwind CSS 4 |
+| Styling | Tailwind CSS 4 (`DynaPuff`, `Fredoka`, `Plus Jakarta Sans`) |
 | Routing | React Router 7 |
+| QR & Export | `qrcode`, `jsqr`, `xlsx`, `html2pdf.js` |
 | Authentication | Firebase Authentication |
 | Data and synchronization | Cloud Firestore |
 | Hosting | Firebase Hosting |
@@ -63,17 +65,18 @@ The current implementation centers on staff-controlled anime and fandom challeng
 
 ```text
 kanvahati-pos/
-├── public/             # Static assets
+├── public/             # Static assets (logo, static fallback qris.png, arcade media)
 ├── src/
 │   ├── arcade/         # Arcade pages, components, data, and services
 │   ├── components/     # Shared UI components
 │   ├── pages/          # POS, inventory, reports, and admin views
-│   ├── services/       # Application data and authentication services
+│   ├── services/       # Application data, DANA SNAP / QRIS resolver, audit, and auth services
+│   ├── utils/          # EMVCo QRIS TLV/CRC16 builder and client-side WebP image compressor
 │   ├── App.jsx         # Routing and application shell
 │   └── firebase.js     # Firebase initialization
 ├── docs/               # Supporting documentation
 ├── scripts/            # Development utilities
-├── tests/              # Automated tests
+├── tests/              # Automated tests (incl. qris.test.mjs)
 ├── firestore.rules     # Database access rules
 ├── firebase.json       # Firebase project configuration
 └── package.json
@@ -138,7 +141,7 @@ The emulator tests require the Firebase CLI and a working local emulator environ
 
 The application uses Firebase Authentication and role-based Firestore Security Rules to restrict access to staff functions and operational data. Arcade answer keys and participant records are subject to separate access controls.
 
-Payment QR generation or display **does not, by itself, confirm that a payment has been received**. Any automated payment confirmation must rely on a verified response from the relevant payment provider.
+Payment QR generation or display **does not, by itself, confirm that a payment has been received**. Client-side EMVCo dynamic QRIS injects the exact transaction amount (`Tag 54`) and reference (`Tag 62.05`) offline from the merchant's verified static QRIS configured in `system/qris`; any automated payment confirmation requires a backend proxy using the DANA SNAP Acquirer API (`POST /v1.0/qr/qr-mpm-generate.htm` & `POST /rest/v1.1/debit/status`) with RSA-2048 private keys kept strictly server-side.
 
 Review Firebase configuration and access rules before deploying, and avoid using production transaction data in development environments.
 

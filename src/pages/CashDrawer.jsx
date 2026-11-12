@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getTransactionsList } from '../services/db';
 import { db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -6,35 +6,29 @@ import { recordAuditLog } from '../services/audit';
 
 export default function CashDrawer({ showToast, activeCashier, onCashierChange, currentUser, userRole }) {
     const [transactions, setTransactions] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [activeMobileTab, setActiveMobileTab] = useState('summary');
 
     // Parse active cashier name (removing the prefix "Kasir ")
-    const parseCashierInfo = () => {
+    const parseCashierInfo = useCallback(() => {
         return activeCashier.replace(/^Kasir\s+/i, '').trim();
-    };
-
-    const [cashierNameInput, setCashierNameInput] = useState(parseCashierInfo());
-
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const txData = await getTransactionsList(true);
-            setTransactions(txData);
-        } catch (e) {
-            console.error("Failed to load transactions", e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    useEffect(() => {
-        setCashierNameInput(parseCashierInfo());
     }, [activeCashier]);
+
+    const [cashierDraft, setCashierDraft] = useState(null);
+    const cashierNameInput = cashierDraft !== null ? cashierDraft : parseCashierInfo();
+    const setCashierNameInput = (val) => setCashierDraft(val);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const txData = await getTransactionsList(true);
+                if (mounted) setTransactions(txData);
+            } catch (e) {
+                console.error("Failed to load transactions", e);
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
 
     // Calculate today's sales summary
     const getTodaySalesSummary = () => {

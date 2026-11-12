@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { formatRupiah, toIntRupiah } from '../utils/currency';
 import { t } from '../services/translations';
 
-export default function ReceiptModal({ transaction, onClose, onPrint }) {
+export default function ReceiptModal({ transaction, onClose }) {
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
     if (!transaction) return null;
 
     const formattedDate = new Date(transaction.timestamp).toLocaleString();
 
-    // Format all receipt values strictly in Indonesian Rupiah (Rp)
-    const formatReceiptMoney = (value) => {
-        return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
-    };
+    // Format all receipt values strictly in integer Indonesian Rupiah (Rp)
+    const formatReceiptMoney = (value) => formatRupiah(value);
+    const txDiscount = toIntRupiah(transaction.transactionDiscount || 0);
 
     const getCleanHtml = () => `
         <div style="font-family: Arial, sans-serif; padding: 20px; width: 280px; color: #000; background: #fff; margin: 0 auto; box-sizing: border-box;">
@@ -28,11 +28,13 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
             <hr style="border: none; border-top: 1.5px dashed #000; margin: 12px 0;" />
             <div style="font-size: 12px; line-height: 1.6;">
                 ${(transaction.items || []).map(item => {
-                    const hasDiscount = (item.discount || 0) > 0;
+                    const itemDisc = toIntRupiah(item.discount || 0);
+                    const hasDiscount = itemDisc > 0;
+                    const lineTotal = toIntRupiah(item.price) * (parseInt(item.qty, 10) || 1);
                     return `
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                        <span style="flex: 1; padding-right: 10px;">${item.qty}x ${item.name}${hasDiscount ? ` <span style="color: #d81b60; font-size: 10px;">(disc -Rp ${item.discount.toLocaleString('id-ID')}/pcs)</span>` : ''}</span>
-                        <span style="font-weight: bold; white-space: nowrap;">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</span>
+                        <span style="flex: 1; padding-right: 10px;">${item.qty}x ${item.name}${hasDiscount ? ` <span style="color: #d81b60; font-size: 10px;">(disc -Rp ${itemDisc.toLocaleString('id-ID')}/pcs)</span>` : ''}</span>
+                        <span style="font-weight: bold; white-space: nowrap;">Rp ${lineTotal.toLocaleString('id-ID')}</span>
                     </div>
                 `}).join('')}
             </div>
@@ -40,30 +42,42 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
             <div style="font-size: 12px; line-height: 1.5;">
                 <div style="display: flex; justify-content: space-between;">
                     <span>Subtotal:</span>
-                    <span>Rp ${(transaction.subtotal || 0).toLocaleString('id-ID')}</span>
+                    <span>${formatReceiptMoney(transaction.subtotal || 0)}</span>
                 </div>
                 ${(transaction.appliedBundles || []).map(b => `
                     <div style="display: flex; justify-content: space-between; color: #d81b60;">
                         <span>Promo: ${b.bundleName}</span>
-                        <span>-Rp ${b.discount.toLocaleString('id-ID')}</span>
+                        <span>-${formatReceiptMoney(b.discount || 0)}</span>
                     </div>
                 `).join('')}
+                ${txDiscount > 0 ? `
+                    <div style="display: flex; justify-content: space-between; color: #d81b60;">
+                        <span>Diskon Transaksi:</span>
+                        <span>-${formatReceiptMoney(txDiscount)}</span>
+                    </div>
+                ` : ''}
                 <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #000;">
                     <span>Total Akhir:</span>
-                    <span>Rp ${(transaction.total || 0).toLocaleString('id-ID')}</span>
+                    <span>${formatReceiptMoney(transaction.total || 0)}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-top: 4px;">
                     <span>Metode:</span>
                     <span style="font-weight: bold;">${transaction.paymentMethod === 'cash' ? 'TUNAI' : 'QRIS'}</span>
                 </div>
+                ${transaction.qrisRef ? `
+                    <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: #555;">
+                        <span>Ref QRIS:</span>
+                        <span style="font-family: monospace;">${transaction.qrisRef}</span>
+                    </div>
+                ` : ''}
                 ${transaction.cashReceived !== undefined ? `
                     <div style="display: flex; justify-content: space-between; margin-top: 4px;">
                         <span>Uang Diterima:</span>
-                        <span>Rp ${(transaction.cashReceived || 0).toLocaleString('id-ID')}</span>
+                        <span>${formatReceiptMoney(transaction.cashReceived || 0)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-top: 4px; font-weight: bold; color: #166534;">
                         <span>Kembalian / Angsul:</span>
-                        <span>Rp ${(transaction.change || 0).toLocaleString('id-ID')}</span>
+                        <span>${formatReceiptMoney(transaction.change || 0)}</span>
                     </div>
                 ` : ''}
             </div>
@@ -200,6 +214,12 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                                 <span>-{formatReceiptMoney(b.discount)}</span>
                             </div>
                         ))}
+                        {txDiscount > 0 && (
+                            <div className="r-summary-row flex justify-between text-pink font-tag font-bold text-[11px]">
+                                <span>Diskon Transaksi:</span>
+                                <span>-{formatReceiptMoney(txDiscount)}</span>
+                            </div>
+                        )}
                         <div className="r-summary-row font-title font-bold flex justify-between text-[16px] border-t-2 border-dashed border-text/40 pt-2 mt-1">
                             <span>{t.grandTotal}:</span>
                             <span className="text-text">{formatReceiptMoney(transaction.total || 0)}</span>
@@ -210,6 +230,12 @@ export default function ReceiptModal({ transaction, onClose, onPrint }) {
                                 {transaction.paymentMethod === 'cash' ? t.cash : t.qris}
                             </span>
                         </div>
+                        {transaction.qrisRef && (
+                            <div className="r-summary-row flex justify-between text-[10.5px] font-mono text-text/75 pt-1">
+                                <span>Ref QRIS:</span>
+                                <span>{transaction.qrisRef}</span>
+                            </div>
+                        )}
                         {transaction.cashReceived !== undefined && (
                             <>
                                 <div className="r-summary-row flex justify-between text-[11.5px] font-bold text-text/80 pt-1 border-t border-dashed border-text/20 mt-1">

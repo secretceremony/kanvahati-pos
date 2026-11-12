@@ -1,6 +1,8 @@
 // --- Unified Data Layer with In-Memory Caching (Firestore & LocalStorage Fallback) ---
 import { db } from '../firebase';
-import { collection, getDocs, setDoc, doc, deleteDoc, writeBatch, runTransaction, query, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch, runTransaction, query, orderBy, limit, collection } from 'firebase/firestore';
+import { DEFAULT_STATIC_QRIS_PAYLOAD } from '../utils/qris';
+import { toIntRupiah, applyDiscountPurgeToProducts } from '../utils/currency';
 
 // Initial Product Data (All natively in IDR Rupiah)
 const initialProducts = [
@@ -20,6 +22,7 @@ const LOCAL_TXS_KEY = 'kanvahati_pos_local_transactions_idr';
 const LOCAL_CATS_KEY = 'kanvahati_pos_local_categories_idr';
 const LOCAL_CASH_DRAWER_KEY = 'kanvahati_pos_local_cash_drawer_idr';
 const PENDING_TXS_KEY = 'kanvahati_pos_pending_transactions_queue';
+const LOCAL_QRIS_CONFIG_KEY = 'kanvahati_pos_local_qris_config';
 const defaultCategories = [];
 
 // In-Memory Global Caches
@@ -27,6 +30,7 @@ let cacheProducts = null;
 let cacheCategories = null;
 let cacheTransactions = null;
 let cacheCashDrawer = null;
+let cacheQrisConfig = null;
 
 const getLocalProducts = () => {
     const stored = localStorage.getItem(LOCAL_PRODS_KEY);
@@ -192,17 +196,27 @@ export const getProducts = async (forceRefetch = false) => {
 
 // Save product (Add or Update)
 export const saveProduct = async (product) => {
+    const cleanVariations = Array.isArray(product.variations)
+        ? product.variations.map(v => ({
+            ...v,
+            name: String(v.name || '').trim(),
+            price: toIntRupiah(v.price),
+            discount: toIntRupiah(v.discount || 0),
+            stock: parseInt(v.stock || 0, 10) || 0
+        }))
+        : [];
+
     const cleanProduct = {
         id: product.id.trim().toUpperCase(),
         name: product.name.trim(),
-        price: parseFloat(product.price || 0),
-        discount: parseFloat(product.discount || 0),
+        price: toIntRupiah(product.price),
+        discount: cleanVariations.length > 0 ? 0 : toIntRupiah(product.discount || 0),
         category: product.category || 'stickers',
-        stock: parseInt(product.stock || 0),
+        stock: parseInt(product.stock || 0, 10) || 0,
         img: product.img || 'assets/mascot.png',
         tag: product.tag || '',
         hiddenFromCatalogue: Boolean(product.hiddenFromCatalogue),
-        variations: product.variations || []
+        variations: cleanVariations
     };
 
     // Update in-memory cache first
@@ -438,30 +452,52 @@ export const getTransactionsList = async (forceRefetch = false, maxResults = 300
 // Save a new transaction (decrements variation stock if matching)
 export const saveTransaction = async (items, totals, paymentMethod, cashier, appliedBundles = [], cashDetails = null) => {
     const txId = "TX-" + Math.floor(100000 + Math.random() * 900000);
+    const totalItemDiscount = toIntRupiah(
+        totals.totalItemDiscount ?? items.reduce((sum, it) => sum + toIntRupiah(it.discount || 0) * (parseInt(it.qty, 10) || 1), 0)
+    );
+    const transactionDiscount = toIntRupiah(totals.transactionDiscount || 0);
+    const cleanAppliedBundles = (appliedBundles || []).map(b => ({
+        ...b,
+        originalPrice: toIntRupiah(b.originalPrice),
+        bundlePrice: toIntRupiah(b.bundlePrice),
+        discount: toIntRupiah(b.discount)
+    }));
+
     const newTx = {
         id: txId,
         timestamp: new Date().toISOString(),
-        items: items.map(item => ({
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            originalPrice: item.originalPrice || item.price,
-            discount: item.discount || 0,
-            qty: item.qty,
-            variationName: item.variationName || null,
-            fromBundle: item.fromBundle || null
-        })),
-        appliedBundles: appliedBundles,
-        qty: totals.qty,
-        subtotal: totals.subtotal,
-        total: totals.total,
+        items: items.map(item => {
+            const unitDisc = toIntRupiah(item.discount || 0);
+            const netPrice = toIntRupiah(item.price);
+            const origPrice = item.originalPrice !== undefined
+                ? toIntRupiah(item.originalPrice)
+                : netPrice + unitDisc;
+            return {
+                id: item.id,
+                name: item.name,
+                price: netPrice,
+                originalPrice: origPrice,
+                discount: unitDisc,
+                qty: parseInt(item.qty, 10) || 1,
+                variationName: item.variationName || null,
+                fromBundle: item.fromBundle || null
+            };
+        }),
+        appliedBundles: cleanAppliedBundles,
+        totalItemDiscount,
+        transactionDiscount,
+        qty: parseInt(totals.qty, 10) || 0,
+        subtotal: toIntRupiah(totals.subtotal),
+        total: toIntRupiah(totals.total),
         paymentMethod: paymentMethod,
         cashier: (cashier || "Staf").replace(/^Kasir\s+/i, '')
     };
 
-    if (cashDetails) {
-        if (cashDetails.cashReceived !== undefined) newTx.cashReceived = cashDetails.cashReceived;
-        if (cashDetails.change !== undefined) newTx.change = cashDetails.change;
+    if (cashDetails && typeof cashDetails === 'object' && !('nativeEvent' in cashDetails)) {
+        if (cashDetails.cashReceived !== undefined) newTx.cashReceived = toIntRupiah(cashDetails.cashReceived);
+        if (cashDetails.change !== undefined) newTx.change = toIntRupiah(cashDetails.change);
+        if (cashDetails.qrisRef) newTx.qrisRef = cashDetails.qrisRef;
+        if (cashDetails.qrisSource) newTx.qrisSource = cashDetails.qrisSource;
     }
 
 // 4. Update in-memory product stock cache directly!
@@ -596,7 +632,7 @@ export const syncQueuedTransactions = async () => {
     const rawQueue = localStorage.getItem(PENDING_TXS_KEY);
     if (!rawQueue) return { synced: 0, remaining: 0 };
 
-    let queue = [];
+    let queue;
     try {
         queue = JSON.parse(rawQueue);
     } catch {
@@ -613,29 +649,43 @@ export const syncQueuedTransactions = async () => {
     for (const entry of queue) {
         const { tx, items } = entry;
         try {
-            await setDoc(doc(db, "transactions", tx.id), tx);
-            if (Array.isArray(items)) {
-                for (const item of items) {
-                    const docRef = doc(db, "products", item.id);
-                    const prodsList = await getProducts();
-                    const original = prodsList.find(p => p.id === item.id);
-                    if (original) {
+            await runTransaction(db, async (t) => {
+                const txRef = doc(db, "transactions", tx.id);
+                const existingTx = await t.get(txRef);
+                if (existingTx.exists()) {
+                    return; // Already synced previously (idempotent)
+                }
+
+                const productReads = [];
+                if (Array.isArray(items)) {
+                    for (const item of items) {
+                        const docRef = doc(db, "products", item.id);
+                        const snap = await t.get(docRef);
+                        productReads.push({ item, docRef, snap });
+                    }
+                }
+
+                t.set(txRef, tx);
+
+                for (const { item, docRef, snap } of productReads) {
+                    if (snap.exists()) {
+                        const original = snap.data();
                         if (item.variationName && original.variations && original.variations.length > 0) {
                             const variations = original.variations.map(v => {
                                 if (v.name === item.variationName) {
-                                    return { ...v, stock: Math.max(0, v.stock - item.qty) };
+                                    return { ...v, stock: Math.max(0, (v.stock || 0) - item.qty) };
                                 }
                                 return v;
                             });
-                            const newStock = variations.reduce((sum, v) => sum + v.stock, 0);
-                            await setDoc(docRef, { ...original, variations, stock: newStock });
+                            const newStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+                            t.update(docRef, { variations, stock: newStock });
                         } else {
-                            const newStock = Math.max(0, original.stock - item.qty);
-                            await setDoc(docRef, { ...original, stock: newStock });
+                            const newStock = Math.max(0, (original.stock || 0) - item.qty);
+                            t.update(docRef, { stock: newStock });
                         }
                     }
                 }
-            }
+            });
             syncedCount++;
         } catch (err) {
             console.warn("Failed to sync queued transaction:", tx.id, err);
@@ -1018,7 +1068,7 @@ export const saveBundle = async (bundle) => {
             variationName: item.variationName || null,
             qty: parseInt(item.qty || 1)
         })),
-        bundlePrice: parseFloat(bundle.bundlePrice || 0),
+        bundlePrice: toIntRupiah(bundle.bundlePrice || 0),
         isActive: bundle.isActive !== undefined ? bundle.isActive : true,
         createdAt: bundle.createdAt || new Date().toISOString()
     };
@@ -1095,14 +1145,22 @@ export const sp_import_products_batch = async (productsList) => {
     const sanitized = productsList.map(p => ({
         id: (p.id || '').trim().toUpperCase(),
         name: (p.name || '').trim(),
-        price: parseFloat(p.price || 0),
-        discount: parseFloat(p.discount || 0),
+        price: toIntRupiah(p.price || 0),
+        discount: Array.isArray(p.variations) && p.variations.length > 0 ? 0 : toIntRupiah(p.discount || 0),
         category: p.category || 'stickers',
-        stock: parseInt(p.stock || 0),
+        stock: parseInt(p.stock || 0, 10) || 0,
         img: p.img || 'assets/mascot.png',
         tag: p.tag || '',
         hiddenFromCatalogue: Boolean(p.hiddenFromCatalogue),
-        variations: Array.isArray(p.variations) ? p.variations : []
+        variations: Array.isArray(p.variations)
+            ? p.variations.map(v => ({
+                ...v,
+                name: String(v.name || '').trim(),
+                price: toIntRupiah(v.price),
+                discount: toIntRupiah(v.discount || 0),
+                stock: parseInt(v.stock || 0, 10) || 0
+            }))
+            : []
     }));
 
     // Update in-memory cache
@@ -1163,7 +1221,7 @@ export const sp_import_bundles_batch = async (bundlesList) => {
             variationName: item.variationName || null,
             qty: parseInt(item.qty || 1)
         })),
-        bundlePrice: parseFloat(b.bundlePrice || 0),
+        bundlePrice: toIntRupiah(b.bundlePrice || 0),
         isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
         createdAt: b.createdAt || new Date().toISOString()
     }));
@@ -1250,7 +1308,7 @@ export const fn_calculate_bundle_savings = (bundle, allProducts) => {
         }
     });
 
-    const promoPrice = parseFloat(bundle.bundlePrice || 0);
+    const promoPrice = toIntRupiah(bundle.bundlePrice || 0);
     const savings = Math.max(0, originalTotal - promoPrice);
     const discountPercent = originalTotal > 0 ? Math.round((savings / originalTotal) * 100) : 0;
 
@@ -1289,4 +1347,258 @@ export const fn_validate_cart_stock_integrity = async (cartItems) => {
     }
 
     return { valid: true };
+};
+
+// =========================================================================
+// QRIS CONFIGURATION (system/qris)
+// =========================================================================
+
+const DEFAULT_QRIS_CONFIG = {
+    mode: 'emv_dynamic', // 'emv_dynamic' | 'dana_snap' | 'static_image'
+    staticPayload: DEFAULT_STATIC_QRIS_PAYLOAD,
+    merchantName: 'silvxeri',
+    danaProxyUrl: '',
+    merchantId: '',
+    storeId: '',
+    subMerchantId: '',
+    terminalId: ''
+};
+
+export const getQrisConfig = async (forceRefetch = false) => {
+    if (cacheQrisConfig && !forceRefetch) {
+        return { ...cacheQrisConfig };
+    }
+
+    let cfg = { ...DEFAULT_QRIS_CONFIG };
+    if (!isFirebaseConfigured) {
+        try {
+            const stored = localStorage.getItem(LOCAL_QRIS_CONFIG_KEY);
+            if (stored) cfg = { ...cfg, ...JSON.parse(stored) };
+        } catch {
+            // keep default
+        }
+    } else {
+        try {
+            const snap = await getDoc(doc(db, 'system', 'qris'));
+            if (snap.exists()) {
+                cfg = { ...cfg, ...snap.data() };
+            } else {
+                const stored = localStorage.getItem(LOCAL_QRIS_CONFIG_KEY);
+                if (stored) cfg = { ...cfg, ...JSON.parse(stored) };
+            }
+        } catch (e) {
+            console.warn('Firestore read system/qris failed, using local/default config:', e);
+            try {
+                const stored = localStorage.getItem(LOCAL_QRIS_CONFIG_KEY);
+                if (stored) cfg = { ...cfg, ...JSON.parse(stored) };
+            } catch {
+                // ignore
+            }
+        }
+    }
+
+    cacheQrisConfig = cfg;
+    return { ...cfg };
+};
+
+export const saveQrisConfig = async (nextConfig) => {
+    const clean = {
+        ...DEFAULT_QRIS_CONFIG,
+        ...nextConfig,
+        staticPayload: String(nextConfig?.staticPayload || DEFAULT_STATIC_QRIS_PAYLOAD).trim(),
+        merchantName: String(nextConfig?.merchantName || 'silvxeri').trim(),
+        danaProxyUrl: String(nextConfig?.danaProxyUrl || '').trim(),
+        merchantId: String(nextConfig?.merchantId || '').trim(),
+        storeId: String(nextConfig?.storeId || '').trim(),
+        subMerchantId: String(nextConfig?.subMerchantId || '').trim(),
+        terminalId: String(nextConfig?.terminalId || '').trim(),
+        updatedAt: new Date().toISOString()
+    };
+
+    cacheQrisConfig = clean;
+    try {
+        localStorage.setItem(LOCAL_QRIS_CONFIG_KEY, JSON.stringify(clean));
+    } catch {
+        // ignore storage quota errors
+    }
+
+    if (!isFirebaseConfigured) {
+        return clean;
+    }
+
+    await setDoc(doc(db, 'system', 'qris'), clean, { merge: true });
+    await triggerDataUpdate();
+    return clean;
+};
+
+/**
+ * Adjust product stock atomically (delta or exact set) and preserve existing fields.
+ */
+export const adjustProductStock = async (productId, { mode = 'delta', value = 0, variationName = null }) => {
+    const numVal = parseInt(value, 10) || 0;
+    const computeNext = (curr) => (mode === 'set' ? Math.max(0, numVal) : Math.max(0, (curr || 0) + numVal));
+
+    let prevStock = 0;
+    let nextStock = 0;
+
+    if (cacheProducts) {
+        const prod = cacheProducts.find(p => p.id === productId);
+        if (prod) {
+            if (variationName && prod.variations && prod.variations.length > 0) {
+                const v = prod.variations.find(item => item.name === variationName);
+                if (v) {
+                    prevStock = v.stock || 0;
+                    v.stock = computeNext(prevStock);
+                    nextStock = v.stock;
+                }
+                prod.stock = prod.variations.reduce((sum, item) => sum + (item.stock || 0), 0);
+            } else {
+                prevStock = prod.stock || 0;
+                prod.stock = computeNext(prevStock);
+                nextStock = prod.stock;
+            }
+        }
+    }
+
+    if (!isFirebaseConfigured) {
+        const localProds = getLocalProducts();
+        const product = localProds.find(p => p.id === productId);
+        if (product) {
+            if (variationName && product.variations && product.variations.length > 0) {
+                const v = product.variations.find(item => item.name === variationName);
+                if (v) {
+                    prevStock = v.stock || 0;
+                    v.stock = computeNext(prevStock);
+                    nextStock = v.stock;
+                }
+                product.stock = product.variations.reduce((sum, item) => sum + (item.stock || 0), 0);
+            } else {
+                prevStock = product.stock || 0;
+                product.stock = computeNext(prevStock);
+                nextStock = product.stock;
+            }
+            localStorage.setItem(LOCAL_PRODS_KEY, JSON.stringify(localProds));
+        }
+        return { productId, variationName, prevStock, nextStock };
+    }
+
+    try {
+        await runTransaction(db, async (t) => {
+            const prodRef = doc(db, "products", productId);
+            const prodSnap = await t.get(prodRef);
+            if (!prodSnap.exists()) return;
+
+            const product = prodSnap.data();
+            if (variationName && product.variations && product.variations.length > 0) {
+                const variations = product.variations.map(v => {
+                    if (v.name === variationName) {
+                        prevStock = v.stock || 0;
+                        nextStock = computeNext(prevStock);
+                        return { ...v, stock: nextStock };
+                    }
+                    return v;
+                });
+                const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+                t.update(prodRef, { variations, stock: totalStock });
+            } else {
+                prevStock = product.stock || 0;
+                nextStock = computeNext(prevStock);
+                t.update(prodRef, { stock: nextStock });
+            }
+        });
+        await triggerDataUpdate();
+        return { productId, variationName, prevStock, nextStock };
+    } catch (e) {
+        console.error("Firestore adjustProductStock failed, updating locally.", e);
+        const localProds = getLocalProducts();
+        const product = localProds.find(p => p.id === productId);
+        if (product) {
+            if (variationName && product.variations && product.variations.length > 0) {
+                const v = product.variations.find(item => item.name === variationName);
+                if (v) {
+                    prevStock = v.stock || 0;
+                    v.stock = computeNext(prevStock);
+                    nextStock = v.stock;
+                }
+                product.stock = product.variations.reduce((sum, item) => sum + (item.stock || 0), 0);
+            } else {
+                prevStock = product.stock || 0;
+                product.stock = computeNext(prevStock);
+                nextStock = product.stock;
+            }
+            localStorage.setItem(LOCAL_PRODS_KEY, JSON.stringify(localProds));
+        }
+        return { productId, variationName, prevStock, nextStock };
+    }
+};
+
+/**
+ * Purge all item/variation discounts and/or delete all bundle promos cleanly.
+ */
+export const purgeAllDiscountsAndBundles = async ({
+    clearItemDiscounts = true,
+    deleteAllBundles = true
+} = {}) => {
+    const [allProducts, allBundles] = await Promise.all([
+        getProducts(true),
+        getBundles(true)
+    ]);
+
+    const { nextProducts, updatedProductsCount, updatedVariationsCount } = clearItemDiscounts
+        ? applyDiscountPurgeToProducts(allProducts)
+        : { nextProducts: allProducts, updatedProductsCount: 0, updatedVariationsCount: 0 };
+
+    const bundlesToDelete = deleteAllBundles ? allBundles : [];
+    const deletedBundlesCount = bundlesToDelete.length;
+
+    const changedProducts = nextProducts.filter((p, idx) => p !== allProducts[idx]);
+
+    if (clearItemDiscounts && cacheProducts) {
+        cacheProducts = nextProducts;
+    }
+    if (deleteAllBundles && cacheBundles) {
+        cacheBundles = [];
+    }
+
+    if (!isFirebaseConfigured) {
+        if (clearItemDiscounts) {
+            localStorage.setItem(LOCAL_PRODS_KEY, JSON.stringify(nextProducts));
+        }
+        if (deleteAllBundles) {
+            localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify([]));
+        }
+        return { updatedProductsCount, updatedVariationsCount, deletedBundlesCount };
+    }
+
+    try {
+        const ops = [];
+        changedProducts.forEach((prod) => {
+            ops.push({ type: 'set', ref: doc(db, "products", prod.id), data: prod });
+        });
+        bundlesToDelete.forEach((bundle) => {
+            ops.push({ type: 'delete', ref: doc(db, "bundles", bundle.id) });
+        });
+
+        for (let i = 0; i < ops.length; i += 400) {
+            const batch = writeBatch(db);
+            ops.slice(i, i + 400).forEach((op) => {
+                if (op.type === 'set') batch.set(op.ref, op.data);
+                else batch.delete(op.ref);
+            });
+            await batch.commit();
+        }
+        if (ops.length > 0) {
+            await triggerDataUpdate();
+        }
+        return { updatedProductsCount, updatedVariationsCount, deletedBundlesCount };
+    } catch (e) {
+        console.error("Firestore purgeAllDiscountsAndBundles failed. Updating locally.", e);
+        if (clearItemDiscounts) {
+            localStorage.setItem(LOCAL_PRODS_KEY, JSON.stringify(nextProducts));
+        }
+        if (deleteAllBundles) {
+            localStorage.setItem(LOCAL_BUNDLES_KEY, JSON.stringify([]));
+        }
+        return { updatedProductsCount, updatedVariationsCount, deletedBundlesCount, fallback: true };
+    }
 };
