@@ -58,8 +58,9 @@ function Sidebar({ userRole, activeCashier, onLogout, isOpen, onClose }) {
                 <div className={`canopy-stripes h-3 border-b-[2.5px] border-text bg-[repeating-linear-gradient(90deg,var(--color-pink)_0px,var(--color-pink)_20px,var(--color-yellow)_20px,var(--color-yellow)_40px,var(--color-blue)_40px,var(--color-blue)_60px,var(--color-white)_60px,var(--color-white)_80px)]`}></div>
                     
                     <div className="p-3.5 border-b-[2.5px] border-text flex items-center justify-between bg-blue">
-                        <Link to="/" onClick={onClose} className="flex-grow flex items-center justify-center py-1">
-                            <img src="/kanvahati-logo.png" alt="Kanvahati Logo" className="h-11 object-contain filter drop-shadow-[2.5px_2.5px_0px_#171717]" />
+                        <Link to="/" onClick={onClose} className="flex-grow flex items-center justify-center gap-2.5 py-1">
+                            <img src="/icon.webp" alt="Kanvahati Icon" className="h-10 w-10 rounded-xl border-2 border-text object-cover shadow-[2px_2px_0px_#171717] bg-white shrink-0" />
+                            <img src="/kanvahati-logo.png" alt="Kanvahati Logo" className="h-10 object-contain filter drop-shadow-[2.5px_2.5px_0px_#171717]" />
                         </Link>
                         {/* Close button on mobile */}
                         <button 

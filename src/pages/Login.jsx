@@ -57,11 +57,18 @@ export default function Login({ onLoginSuccess, showToast }) {
                 <div className="p-6 md:p-8 flex flex-col">
                 {/* Header Logo */}
                 <div className="text-center mb-6">
-                    <img 
-                        src="/kanvahati-logo.png" 
-                        alt="Kanvahati Logo" 
-                        className="h-14 mx-auto object-contain mb-3 filter drop-shadow-[2px_2px_0px_#181818]"
-                    />
+                    <div className="flex items-center justify-center gap-2.5 mb-3">
+                        <img 
+                            src="/icon.webp" 
+                            alt="Kanvahati Icon" 
+                            className="h-12 w-12 rounded-xl border-2 border-text object-cover shadow-[2.5px_2.5px_0px_#181818] bg-white shrink-0"
+                        />
+                        <img 
+                            src="/kanvahati-logo.png" 
+                            alt="Kanvahati Logo" 
+                            className="h-12 object-contain filter drop-shadow-[2px_2px_0px_#181818]"
+                        />
+                    </div>
                     <h2 className="font-title text-xl text-text leading-tight mb-1 title-stroke">Terminal Kasir</h2>
                     <p className="text-[12px] opacity-75 font-body">Silakan masuk menggunakan akun staf terdaftar.</p>
                 </div>
